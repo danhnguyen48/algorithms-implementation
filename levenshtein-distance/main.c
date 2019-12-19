@@ -5,9 +5,14 @@
 
 void readString(char *firstString);
 int min(int x, int y);
-int max(int x, int y);
+int max(int i, int j, int * levenshteinMatrix, int * trace, int columns);
 int levenshteinDistance(int i, int j, char * firstString, char * secondString, int * levenshteinMatrix, int * trace);
-void printLevenshteinMatrix(int *levenshteinMatrix, char *firstString, char *secondString);
+int minOfNeighbors(int left, int top, int topleft, int * traceElement);
+void printLevenshteinMatrix(int *levenshteinMatrix, int *trace, char *firstString, char *secondString);
+void traceTransformation(char * firstString, char * secondString, int * trace);
+void insertCharacter(char *string, char character, int pos);
+void substituteCharacter(char *string, char character, int pos);
+void delete(char *string, int pos);
 
 int main(int agrc, char** argv) {
 
@@ -31,16 +36,18 @@ int main(int agrc, char** argv) {
     trace = (int *) malloc(strlen(firstString)*strlen(secondString)*sizeof(int));
 
     memset(levenshteinMatrix, -1, strlen(firstString)*strlen(secondString)*sizeof(int));
-    *levenshteinMatrix = 0;
+    *levenshteinMatrix = 0; // First element should be 0
 
     *(levenshteinMatrix + (rows-1)*columns + columns - 1) =
                 levenshteinDistance(rows - 1, columns - 1, firstString, secondString, levenshteinMatrix, trace);
 
     printf("The Levenshtein distance: %d\n", *(levenshteinMatrix + (rows-1)*columns + columns - 1));
-    printLevenshteinMatrix(levenshteinMatrix, firstString, secondString);
+    printLevenshteinMatrix(levenshteinMatrix, trace, firstString, secondString);
+    traceTransformation(firstString, secondString, trace);
 
 }
 
+// Read string char by char to avoid memory waste
 void readString(char *firstString) {
 
     char c;
@@ -62,8 +69,7 @@ int levenshteinDistance(int i, int j, char * firstString, char * secondString, i
     int columns = strlen(firstString);
 
     if (min(i,j) == 0) {
-        *(levenshteinMatrix + i*columns + j) = max(i,j);
-        return max(i,j);
+        return max(i, j, levenshteinMatrix, trace, columns);
     }
     
     // left
@@ -83,17 +89,16 @@ int levenshteinDistance(int i, int j, char * firstString, char * secondString, i
     int top = *(levenshteinMatrix + (i-1)*columns + j);
     int topLeft = *(levenshteinMatrix + (i-1)*columns + j - 1);
 
-    int minOfNeighbors = min(left, top);
-    minOfNeighbors = min(minOfNeighbors, topLeft);
+    int minOfNeighborsElement = minOfNeighbors(left, top, topLeft, trace + i*columns + j);
 
     if ((char)*(firstString + j - 1) == (char)*(secondString + i - 1)) 
-        return minOfNeighbors;
+        return minOfNeighborsElement;
     else
-        return minOfNeighbors + 1;
+        return minOfNeighborsElement + 1;
 
 }
 
-void printLevenshteinMatrix(int *levenshteinMatrix, char *firstString, char *secondString) {
+void printLevenshteinMatrix(int *levenshteinMatrix, int *trace, char *firstString, char *secondString) {
 
     int rows = strlen(secondString);
     int columns = strlen(firstString);
@@ -114,10 +119,93 @@ void printLevenshteinMatrix(int *levenshteinMatrix, char *firstString, char *sec
 
 }
 
+void traceTransformation(char * firstString, char * secondString, int * trace) {
+
+    char *temp = (char *) malloc(strlen(firstString)*sizeof(char));
+    int j = strlen(firstString) - 1, i = strlen(secondString) - 1;
+    int columns = strlen(firstString), rows = strlen(secondString);
+
+    strcpy(temp, firstString);
+    printf("First String: %s\n", temp);
+
+    while (i != 0 && j != 0) {
+        int pos = j;
+        switch (*(trace + i*columns + j)) {
+            case 1: // Insert
+                printf("Insert after character %c at position %d\n", (char) *(secondString + i - 1), pos - 1);
+                insertCharacter(temp, (char) *(secondString + i - 1), pos);
+                printf("New String: %s\n", temp);
+                i--;
+                break;
+            case -1: // Delete
+                printf("Delete %c at position %d\n", *(temp + pos - 1), pos - 1);
+                delete(temp, pos);
+                printf("New String: %s\n", temp);
+                j--;
+                break;
+            case 0:
+                printf("Substitute %c at position %d by %c\n", *(temp + pos - 1), pos - 1, (char) *(secondString + i - 1));
+                substituteCharacter(temp, (char) *(secondString + i - 1), pos);
+                printf("New String: %s\n", temp);
+                i--; j--;
+                break;
+            default: 
+                break;
+        }
+    }
+
+    printf("Final string: %s\n", temp);
+
+}
+
+int minOfNeighbors(int left, int top, int topleft, int * traceElement) {
+    int min = 999999;
+    if (min >= topleft) {
+        min = topleft;
+        *traceElement = 0;
+    }
+    if (min >= top) {
+        min = top;
+        *traceElement = 1;
+    }
+    if (min >= left) {
+        min = left;
+        *traceElement = -1;
+    }
+    return min;
+}
+
 int min(int x, int y) {
     return x > y ? y : x;
 }
 
-int max(int x, int y) {
-    return x > y ? x : y;
+int max(int i, int j, int * levenshteinMatrix, int * trace, int columns) {
+    if (i == 0) {
+        *(trace + j) = -1;
+        *(levenshteinMatrix + j) = j;
+    } else {
+        *(trace + i*columns) = 1;
+        *(levenshteinMatrix + i*columns) = i;
+    }
+    return *(levenshteinMatrix + i*columns + j);
+}
+
+void insertCharacter(char *string, char character, int pos) {
+    char *buf = (char *) malloc((pos)*sizeof(char));
+    strncpy(buf, string, pos);
+    buf = (char *) realloc(buf, sizeof(char));
+    *(buf + pos) = character;
+    buf = (char *) realloc(buf, (strlen(string) - pos)*sizeof(char));
+    strcpy(buf + pos+1, string + pos);
+    string = (char *) realloc(string, sizeof(char));
+    strcpy(string, buf);
+}
+
+void substituteCharacter(char *string, char character, int pos) {
+    char *pointPos = string + pos - 1;
+    *pointPos = character;
+}
+
+void delete(char *string, int pos) {
+    memmove(string + pos - 1, string + pos, (strlen(string) - 1)*sizeof(char));
 }
