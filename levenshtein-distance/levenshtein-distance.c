@@ -44,6 +44,11 @@ int main(int agrc, char** argv) {
     printf("The Levenshtein distance: %d\n", *(levenshteinMatrix + (rows-1)*columns + columns - 1));
     printLevenshteinMatrix(levenshteinMatrix, trace, firstString, secondString);
     traceTransformation(firstString, secondString, trace);
+    
+    free(firstString); free(secondString);
+    free(levenshteinMatrix); free(trace);
+    
+    return 0;
 
 }
 
