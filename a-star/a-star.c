@@ -6,6 +6,13 @@
 #define spain_map "spain.csv"
 #define CHUNK_READING_SIZE 128
 
+/*
+### Format: node|@id|@name|@place|@highway|@route|@ref|@oneway|@maxspeed|node_lat|node_lon
+### Format: way|@id|@name|@place|@highway|@route|@ref|@oneway|@maxspeed|member nodes|...
+### Format: relation|@id|@name|@place|@highway|@route|@ref|@oneway|@maxspeed|relation_type|membertype;@id;@role|...
+
+*/
+
 typedef struct {
     unsigned long id;
     char *name;
@@ -13,6 +20,29 @@ typedef struct {
     unsigned short nsucc;
     unsigned long *successors;
 } node;
+
+// protocol
+int get_my_line(FILE *fp, char **line, size_t *max_len); // Gets line by line from file
+void readFile(char *file_name, node **nodes); // Reads file
+void count_nodes(char *file_name, int *amount); // Counts the amount of nodes
+
+
+int main(int argc, char **argv) {
+
+    char *file_name = cataluna_map;
+    node *nodes = NULL;
+    int amount_nodes = 0;
+
+    if (argc>1 && strcmp(argv[1], "spain") == 0) {
+        file_name = spain_map;
+    }
+
+    count_nodes(file_name, &amount_nodes);
+    // readFile(file_name, &nodes);
+
+    return 0;
+
+}
 
 int get_my_line(FILE *fp, char **line, size_t *max_len) {
 
@@ -51,7 +81,7 @@ int get_my_line(FILE *fp, char **line, size_t *max_len) {
 
 }
 
-void readFile(char *file_name, node *nodes) {
+void readFile(char *file_name, node **nodes) {
 
     FILE *fp = fopen(file_name, "r");
 
@@ -61,27 +91,42 @@ void readFile(char *file_name, node *nodes) {
     }
 
     char *line = NULL;
-    size_t max_len = 0;
+    size_t max_len = CHUNK_READING_SIZE;
+    int current_node = 0;
     while (get_my_line(fp, &line, &max_len) != -1) {
 
-        printf("bb: %s", line);
+        // proceed_line(line, nodes, &current_node);
 
     }
     
 
 }
 
-int main(int argc, char **argv) {
 
-    char *file_name = cataluna_map;
-    node *nodes = NULL;
+void count_nodes(char *file_name, int *amount) {
 
-    if (argc>1 && strcmp(argv[1], "spain") == 0) {
-        file_name = spain_map;
+    FILE *fp = fopen(file_name, "r");
+    int begin = 1;
+
+    if (fp == NULL) {
+        printf("Unable to open %s file", file_name);
+        exit(1);
     }
 
-    readFile(file_name, nodes);
+    char chunk[CHUNK_READING_SIZE]; // buffer where is read into
 
-    return 0;
+    while (fgets(chunk, sizeof(chunk), fp) != NULL) {
+
+        if (begin == 1 && chunk[0] == '#') continue;
+        size_t len_chunk_used = strlen(chunk);
+        if (begin == 1) {
+            if (chunk[0] == 'n') (*amount)++;
+            else return;
+        }
+
+        if (chunk[len_chunk_used-1] == '\n') begin = 1;
+        else begin = 0;
+
+    }
 
 }
