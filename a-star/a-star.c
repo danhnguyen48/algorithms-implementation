@@ -21,9 +21,36 @@ typedef struct {
     unsigned long *successors;
 } node;
 
+int proceed_line(char *line, node **nodes, int *current) {
+
+    if (*line == '#') return 0;
+
+    char *found = NULL;
+    int count = 0;
+    char *endptr;
+    found = strsep(&line, "|");
+    if (strcmp(found, "node") != 0) return -1;
+
+    while ((found = strsep(&line, "|")) != NULL) {
+        count++;
+        switch (count)
+        {
+        case 1:
+            (*nodes + *current)->id = strtoul(found, &endptr, 10);
+            break;
+        default:
+            break;
+        }
+    }
+    (*current)++;
+
+    return 0;
+
+}
+
 // protocol
 int get_my_line(FILE *fp, char **line, size_t *max_len); // Gets line by line from file
-void readFile(char *file_name, node **nodes); // Reads file
+void readFile(char *file_name, node **nodes, int amount_nodes); // Reads file
 void count_nodes(char *file_name, int *amount); // Counts the amount of nodes
 
 
@@ -38,7 +65,7 @@ int main(int argc, char **argv) {
     }
 
     count_nodes(file_name, &amount_nodes);
-    // readFile(file_name, &nodes);
+    readFile(file_name, &nodes, amount_nodes);
 
     return 0;
 
@@ -81,7 +108,7 @@ int get_my_line(FILE *fp, char **line, size_t *max_len) {
 
 }
 
-void readFile(char *file_name, node **nodes) {
+void readFile(char *file_name, node **nodes, int amount_nodes) {
 
     FILE *fp = fopen(file_name, "r");
 
@@ -93,12 +120,14 @@ void readFile(char *file_name, node **nodes) {
     char *line = NULL;
     size_t max_len = CHUNK_READING_SIZE;
     int current_node = 0;
+
+    *nodes = (node *) malloc(amount_nodes*sizeof(node));
+
     while (get_my_line(fp, &line, &max_len) != -1) {
 
-        // proceed_line(line, nodes, &current_node);
+        proceed_line(line, nodes, &current_node);
 
     }
-    
 
 }
 
