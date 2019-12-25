@@ -4,6 +4,7 @@
 
 #define cataluna_map "cataluna.csv"
 #define spain_map "spain.csv"
+#define CHUNK_READING_SIZE 128
 
 typedef struct {
     unsigned long id;
@@ -13,27 +14,35 @@ typedef struct {
     unsigned long *successors;
 } node;
 
-int get_my_line(FILE *fp) {
+int get_my_line(FILE *fp, char **line, size_t *max_len) {
 
-    char chunk[128]; // buffer where is read into
-    char *line = NULL;
-    size_t len_used;
+    if(line == NULL || fp == NULL) {
+        return -1;
+    }
+
+    char chunk[CHUNK_READING_SIZE]; // buffer where is read into
+
+    if (*line == NULL || *max_len < sizeof(chunk)) {
+        *line = malloc(sizeof(chunk));
+    }
+    (*line)[0] = '\0'; // empty string
+
     while (fgets(chunk, sizeof(chunk), fp) != NULL) {
-        if (line != NULL) {
-            line = realloc(line, sizeof(chunk));
-        } else {
-            line = malloc(sizeof(chunk));
-            len_used = 0;
-        }
+
         size_t len_chunk_used = strlen(chunk);
+        size_t len_used = strlen(*line);
 
-        memcpy(line + len_used, chunk, len_chunk_used);
+        if (*max_len - len_used < len_chunk_used) {
+            *max_len += CHUNK_READING_SIZE;
+            *line = realloc(*line, *max_len*sizeof(char));
+        }
+
+        memcpy(*line + len_used, chunk, len_chunk_used);
         len_used += len_chunk_used;
+        *(*line + len_used) = '\0';
 
-        if (*(line + len_used - 1) == '\n') {
-            int len = strlen(line);
-            free(line);
-            return len;
+        if (*(*line + len_used - 1) == '\n') {
+            return len_used;
         }
 
     }
@@ -51,7 +60,11 @@ void readFile(char *file_name, node *nodes) {
         exit(1);
     }
 
-    while (get_my_line(fp) != -1) {
+    char *line = NULL;
+    size_t max_len = 0;
+    while (get_my_line(fp, &line, &max_len) != -1) {
+
+        printf("bb: %s", line);
 
     }
     
@@ -61,7 +74,7 @@ void readFile(char *file_name, node *nodes) {
 int main(int argc, char **argv) {
 
     char *file_name = cataluna_map;
-    node *nodes;
+    node *nodes = NULL;
 
     if (argc>1 && strcmp(argv[1], "spain") == 0) {
         file_name = spain_map;
