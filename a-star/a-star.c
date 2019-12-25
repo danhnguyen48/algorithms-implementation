@@ -21,37 +21,11 @@ typedef struct {
     unsigned long *successors;
 } node;
 
-int proceed_line(char *line, node **nodes, int *current) {
-
-    if (*line == '#') return 0;
-
-    char *found = NULL;
-    int count = 0;
-    char *endptr;
-    found = strsep(&line, "|");
-    if (strcmp(found, "node") != 0) return -1;
-
-    while ((found = strsep(&line, "|")) != NULL) {
-        count++;
-        switch (count)
-        {
-        case 1:
-            (*nodes + *current)->id = strtoul(found, &endptr, 10);
-            break;
-        default:
-            break;
-        }
-    }
-    (*current)++;
-
-    return 0;
-
-}
-
 // protocol
 int get_my_line(FILE *fp, char **line, size_t *max_len); // Gets line by line from file
 void readFile(char *file_name, node **nodes, int amount_nodes); // Reads file
 void count_nodes(char *file_name, int *amount); // Counts the amount of nodes
+int proceed_line(char *line, node **nodes, int *current); // Store data from file
 
 
 int main(int argc, char **argv) {
@@ -59,6 +33,7 @@ int main(int argc, char **argv) {
     char *file_name = cataluna_map;
     node *nodes = NULL;
     int amount_nodes = 0;
+    unsigned short *nsuccdim;
 
     if (argc>1 && strcmp(argv[1], "spain") == 0) {
         file_name = spain_map;
@@ -157,5 +132,42 @@ void count_nodes(char *file_name, int *amount) {
         else begin = 0;
 
     }
+
+}
+
+int proceed_line(char *line, node **nodes, int *current) {
+
+    if (*line == '#') return 0;
+
+    char *found = NULL;
+    int count = 0;
+    char *endptr;
+    found = strsep(&line, "|");
+    if (strcmp(found, "node") != 0) return -1;
+
+    while ((found = strsep(&line, "|")) != NULL) {
+        count++;
+        switch (count)
+        {
+        case 1:
+            (*nodes + *current)->id = strtoul(found, &endptr, 10);
+            break;
+        case 2:
+            (*nodes + *current)->name = (char *) malloc(strlen(found)*sizeof(char));
+            strcpy((*nodes + *current)->name, found);
+            break;
+        case 9:
+            (*nodes + *current)->lat = strtod(found, &endptr);
+            break;
+        case 10:
+            (*nodes + *current)->lon = strtod(found, &endptr);
+            break;
+        default:
+            break;
+        }
+    }
+    (*current)++;
+
+    return 0;
 
 }
