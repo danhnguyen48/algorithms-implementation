@@ -21,11 +21,77 @@ typedef struct {
     unsigned long *successors;
 } node;
 
-// protocol
-int get_my_line(FILE *fp, char **line, size_t *max_len); // Gets line by line from file
-void readFile(char *file_name, node **nodes, int amount_nodes); // Reads file
-void count_nodes(char *file_name, int *amount); // Counts the amount of nodes
-int proceed_line(char *line, node **nodes, int *current); // Store data from file
+// PROTOCOL
+
+// Gets line by line from file
+int get_my_line(FILE *fp, char **line, size_t *max_len);
+// Reads file
+void readFile(char *file_name, node **nodes, int amount_nodes);
+// Counts the amount of nodes
+void count_nodes(char *file_name, int *amount);
+// Search node by id
+long binari_search_node(unsigned long id, node *nodes, int len_of_node);
+// Create a way from first to second
+void create_way(int first_node, int second_node, node **nodes);
+// Store data from file
+int proceed_node(char *line, node **nodes, int *current);
+// Store way data from file
+int proceed_way(char *line, node **nodes, int amount_nodes);
+
+
+int proceed_way(char *line, node **nodes, int amount_nodes) {
+    
+    char *found = NULL;
+    found = strsep(&line, "|");
+    if (strcmp(found, "way") != 0) return -1;
+    int count = 0;
+    char *endptr;
+    int one_way = 1;
+    long first_node = -1, second_node = -1;
+    unsigned long node_id;
+    unsigned long tempId = 0;
+
+    while ((found = strsep(&line, "|")) != NULL) {
+        count++;
+        switch (count)
+        {
+        case 1:
+            tempId = strtoul(found, &endptr, 10);
+            break;
+        case 2:case 3: case 4: case 5: case 6: case 8:
+            break;
+        case 7:
+            if (strcmp(found, "oneway") == 0) one_way = 1;
+            else one_way = 0;
+            break;
+        default:
+            node_id = strtoul(found, &endptr, 10);
+            if (first_node == -1) {
+                first_node = binari_search_node(node_id, *nodes, amount_nodes);
+            } else {
+                if ((second_node = binari_search_node(node_id, *nodes, amount_nodes)) == -1) {
+                    first_node = -1;
+                    continue;
+                }
+            }
+            if (first_node == -1 || second_node == -1) continue;
+
+            // Create way from first_node to second_node
+            create_way(first_node, second_node, nodes);
+            // Create way from second_node to first_node if !oneway
+            if (one_way == 0) {
+                create_way(second_node, first_node, nodes);
+            }
+            first_node = second_node;
+
+            break;
+        }
+    }
+
+    return 0;
+
+}
+
 
 
 int main(int argc, char **argv) {
@@ -100,7 +166,13 @@ void readFile(char *file_name, node **nodes, int amount_nodes) {
 
     while (get_my_line(fp, &line, &max_len) != -1) {
 
-        proceed_line(line, nodes, &current_node);
+        if (*line == '#') continue;
+
+        if (*line == 'n')
+            proceed_node(line, nodes, &current_node);
+        else if (*line == 'w') 
+            proceed_way(line, nodes, amount_nodes);
+        else break;
 
     }
 
@@ -135,7 +207,7 @@ void count_nodes(char *file_name, int *amount) {
 
 }
 
-int proceed_line(char *line, node **nodes, int *current) {
+int proceed_node(char *line, node **nodes, int *current) {
 
     if (*line == '#') return 0;
 
@@ -151,6 +223,7 @@ int proceed_line(char *line, node **nodes, int *current) {
         {
         case 1:
             (*nodes + *current)->id = strtoul(found, &endptr, 10);
+            (*nodes + *current)->nsucc = 0;
             break;
         case 2:
             (*nodes + *current)->name = (char *) malloc(strlen(found)*sizeof(char));
@@ -171,3 +244,30 @@ int proceed_line(char *line, node **nodes, int *current) {
     return 0;
 
 }
+
+long binari_search_node(unsigned long id, node *nodes, int len_of_node) {
+    int imin = 0;
+    int imax = len_of_node - 1;
+    while (imax >= imin) {
+        int imid = (imin + imax) / 2;
+        if (nodes[imid].id == id) return imid;
+        else if (nodes[imid].id < id) imin = imid + 1;
+        else imax = imid - 1;
+    }
+    return -1;
+}
+
+void create_way(int first_node, int second_node, node **nodes) {
+
+    // Expand one memory block
+    if ((*nodes + first_node)->nsucc == 0) {
+        (*nodes + first_node)->successors = (unsigned long *) malloc(sizeof(unsigned long));
+    } else {
+        (*nodes + first_node)->successors = realloc((*nodes + first_node)->successors, sizeof(unsigned long));
+    }
+    // Create way from first_node to second_node
+    (*nodes + first_node)->successors[(*nodes + first_node)->nsucc] = second_node;
+    (*nodes + first_node)->nsucc++;
+
+}
+
