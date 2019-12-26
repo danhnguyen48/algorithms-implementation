@@ -1,10 +1,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
 #define cataluna_map "cataluna.csv"
 #define spain_map "spain.csv"
 #define CHUNK_READING_SIZE 128
+#define EARTH_RADIUS 6371000
+#define convert_radians(degree) (degree*M_PI/180)
 
 /*
 ### Format: node|@id|@name|@place|@highway|@route|@ref|@oneway|@maxspeed|node_lat|node_lon
@@ -37,6 +40,8 @@ void create_way(int first_node, int second_node, node **nodes);
 int proceed_node(char *line, node **nodes, int *current);
 // Store way data from file
 int proceed_way(char *line, node **nodes, int amount_nodes);
+// Calculate distance between two points
+double distance_between_two_points(node first_point, node second_point);
 
 
 int proceed_way(char *line, node **nodes, int amount_nodes) {
@@ -175,6 +180,7 @@ void readFile(char *file_name, node **nodes, int amount_nodes) {
         else break;
 
     }
+    fclose(fp);
 
 }
 
@@ -271,3 +277,17 @@ void create_way(int first_node, int second_node, node **nodes) {
 
 }
 
+double distance_between_two_points(node first_point, node second_point) {
+
+    double delta_lat = convert_radians(first_point.lat - second_point.lat);
+    double delta_lon = convert_radians(first_point.lon - second_point.lon);
+    double first_lat = convert_radians(first_point.lat);
+    double second_lat = convert_radians(second_point.lat);
+
+    double a = sinf(delta_lat/2)*sinf(delta_lat/2) + cosf(first_lat)*cosf(second_lat)*sinf(delta_lon/2)*sinf(delta_lon/2);
+    double c = 2*atan2f(sqrtf(a), sqrtf(1-a));
+    double d = EARTH_RADIUS * c;
+
+    return d;
+
+}
