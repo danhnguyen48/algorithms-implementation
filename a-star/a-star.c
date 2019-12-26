@@ -24,6 +24,17 @@ typedef struct {
     unsigned long *successors;
 } node;
 
+struct QNode {
+    node *key;
+    double f;
+    double h;
+    struct QNode *next;
+};
+
+typedef struct {
+    struct QNode *front, *rear;
+} open;
+
 // PROTOCOL
 
 // Gets line by line from file
@@ -42,61 +53,14 @@ int proceed_node(char *line, node **nodes, int *current);
 int proceed_way(char *line, node **nodes, int amount_nodes);
 // Calculate distance between two points
 double distance_between_two_points(node first_point, node second_point);
-
-
-int proceed_way(char *line, node **nodes, int amount_nodes) {
-    
-    char *found = NULL;
-    found = strsep(&line, "|");
-    if (strcmp(found, "way") != 0) return -1;
-    int count = 0;
-    char *endptr;
-    int one_way = 1;
-    long first_node = -1, second_node = -1;
-    unsigned long node_id;
-    unsigned long tempId = 0;
-
-    while ((found = strsep(&line, "|")) != NULL) {
-        count++;
-        switch (count)
-        {
-        case 1:
-            tempId = strtoul(found, &endptr, 10);
-            break;
-        case 2:case 3: case 4: case 5: case 6: case 8:
-            break;
-        case 7:
-            if (strcmp(found, "oneway") == 0) one_way = 1;
-            else one_way = 0;
-            break;
-        default:
-            node_id = strtoul(found, &endptr, 10);
-            if (first_node == -1) {
-                first_node = binari_search_node(node_id, *nodes, amount_nodes);
-            } else {
-                if ((second_node = binari_search_node(node_id, *nodes, amount_nodes)) == -1) {
-                    first_node = -1;
-                    continue;
-                }
-            }
-            if (first_node == -1 || second_node == -1) continue;
-
-            // Create way from first_node to second_node
-            create_way(first_node, second_node, nodes);
-            // Create way from second_node to first_node if !oneway
-            if (one_way == 0) {
-                create_way(second_node, first_node, nodes);
-            }
-            first_node = second_node;
-
-            break;
-        }
-    }
-
-    return 0;
-
-}
-
+// Create open list
+open *create_queue();
+// Import qnode into queue
+int import_queue(open *q, struct QNode *qnode);
+// Dequeue queue
+struct QNode *de_queue(open *q);
+// New QNode
+struct QNode *new_qnode(double f, double h, node *key);
 
 
 int main(int argc, char **argv) {
@@ -105,6 +69,9 @@ int main(int argc, char **argv) {
     node *nodes = NULL;
     int amount_nodes = 0;
     unsigned short *nsuccdim;
+    int *trace;
+    double *g;
+    open *open_list = create_queue();
 
     if (argc>1 && strcmp(argv[1], "spain") == 0) {
         file_name = spain_map;
@@ -251,6 +218,59 @@ int proceed_node(char *line, node **nodes, int *current) {
 
 }
 
+int proceed_way(char *line, node **nodes, int amount_nodes) {
+    
+    char *found = NULL;
+    found = strsep(&line, "|");
+    if (strcmp(found, "way") != 0) return -1;
+    int count = 0;
+    char *endptr;
+    int one_way = 1;
+    long first_node = -1, second_node = -1;
+    unsigned long node_id;
+    unsigned long tempId = 0;
+
+    while ((found = strsep(&line, "|")) != NULL) {
+        count++;
+        switch (count)
+        {
+        case 1:
+            tempId = strtoul(found, &endptr, 10);
+            break;
+        case 2:case 3: case 4: case 5: case 6: case 8:
+            break;
+        case 7:
+            if (strcmp(found, "oneway") == 0) one_way = 1;
+            else one_way = 0;
+            break;
+        default:
+            node_id = strtoul(found, &endptr, 10);
+            if (first_node == -1) {
+                first_node = binari_search_node(node_id, *nodes, amount_nodes);
+            } else {
+                if ((second_node = binari_search_node(node_id, *nodes, amount_nodes)) == -1) {
+                    first_node = -1;
+                    continue;
+                }
+            }
+            if (first_node == -1 || second_node == -1) continue;
+
+            // Create way from first_node to second_node
+            create_way(first_node, second_node, nodes);
+            // Create way from second_node to first_node if !oneway
+            if (one_way == 0) {
+                create_way(second_node, first_node, nodes);
+            }
+            first_node = second_node;
+
+            break;
+        }
+    }
+
+    return 0;
+
+}
+
 long binari_search_node(unsigned long id, node *nodes, int len_of_node) {
     int imin = 0;
     int imax = len_of_node - 1;
@@ -289,5 +309,72 @@ double distance_between_two_points(node first_point, node second_point) {
     double d = EARTH_RADIUS * c;
 
     return d;
+
+}
+
+
+open* create_queue() {
+
+    open *q = (open *) malloc(sizeof(open));
+    q->front = q->rear = NULL;
+    return q;
+
+}
+
+int import_queue(open *q, struct QNode *qnode) {
+
+    if (q->rear == NULL) {
+        q->front = q->rear = qnode;
+        return 1;
+    }
+
+    if (qnode->f <= q->front->f) {
+        qnode->next = q->front;
+        q->front = qnode;
+        return 1;
+    }
+
+    struct QNode *temp = q->front;
+
+    while (temp->next != NULL && qnode->f > temp->next->f)
+        temp = temp->next;
+    
+    if (temp->next == NULL) {
+        q->rear->next = qnode;
+        q->rear = qnode;
+    } else {
+        qnode->next = temp->next;
+        temp->next = qnode;
+    }
+    return 1;
+
+}
+
+struct QNode *de_queue(open *q) {
+
+    // Queue empty
+    if (q->front == NULL) return NULL;
+
+    struct QNode *temp = q->front;
+    free(temp);
+    q->front = q->front->next;
+
+    // If front NULL, queue will be NULL so change rear to be NULL
+    if (q->front == NULL)
+        q->rear = NULL;
+
+    return temp;
+
+}
+
+struct QNode *new_qnode(double f, double h, node *key) {
+
+    struct QNode *qnode = (struct QNode *) malloc(sizeof(struct QNode));
+    qnode->f = f;
+    qnode->h = h;
+    qnode->key = key;
+    qnode->next = NULL;
+    
+    return qnode;
 
 }
