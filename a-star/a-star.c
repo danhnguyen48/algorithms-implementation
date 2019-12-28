@@ -7,7 +7,7 @@
 #define spain_map "spain.csv"
 #define CHUNK_READING_SIZE 128
 #define EARTH_RADIUS 6371000
-#define convert_radians(degree) (degree*M_PI/180)
+#define MAX_DOUBLE 66.9
 
 /*
 ### Format: node|@id|@name|@place|@highway|@route|@ref|@oneway|@maxspeed|node_lat|node_lon
@@ -40,19 +40,19 @@ typedef struct {
 // Gets line by line from file
 int get_my_line(FILE *fp, char **line, size_t *max_len);
 // Reads file
-void readFile(char *file_name, node **nodes, int amount_nodes);
+void readFile(char *file_name, node **nodes, unsigned int amount_nodes);
 // Counts the amount of nodes
-void count_nodes(char *file_name, int *amount);
+void count_nodes(char *file_name, unsigned int *amount);
 // Search node by id
-long binari_search_node(unsigned long id, node *nodes, int len_of_node);
+long binary_search_node(unsigned long id, node *nodes, int len_of_node);
 // Create a way from first to second
 void create_way(int first_node, int second_node, node **nodes);
 // Store data from file
 int proceed_node(char *line, node **nodes, int *current);
 // Store way data from file
-int proceed_way(char *line, node **nodes, int amount_nodes);
+int proceed_way(char *line, node **nodes, unsigned int amount_nodes);
 // Calculate distance between two points
-double distance_between_two_points(node first_point, node second_point);
+double distance_between_two_points(node *first_point, node *second_point);
 // Create open list
 open *create_queue();
 // Import qnode into queue
@@ -63,83 +63,22 @@ struct QNode *de_queue(open *q);
 struct QNode *new_qnode(double f, double h, node *key);
 // Check if queue is empty => 1 is empty and 0 is no empty
 int queue_empty(open *q);
-
-struct QNode *is_node_in_open_list(open *q, node n) {
-
-    if (q->rear == NULL || q->front == NULL) return 0;
-
-    struct QNode *temp = q->front;
-
-    while (temp->key->id != n.id) {
-        temp = temp->next;
-        if (temp == NULL) return NULL;
-    }
-    return temp;
-
-}
-
-void a_start(node *source, node *goal, open *q, int **trace, double **g, int amount_nodes, node **nodes) {
-
-    struct QNode *current;
-    double estimated_g;
-
-    // Create source in queue
-    double source_h = distance_between_two_points(*source, *goal);
-    double source_f = source_h;
-    struct QNode *source_qnode = new_qnode(source_f, source_h, source);
-    import_queue(q, source_qnode);
-
-    // initilize data for trace and g
-    memset(*trace, -1, amount_nodes*sizeof(int));
-    memset(*g, MAXFLOAT, amount_nodes*sizeof(double));
-
-    while (queue_empty(q) == 0) {
-
-        current = de_queue(q);
-        if (current->key == goal) {
-            printf("The lowest cost is %f\n", *g[current->key->index]);
-        }
-
-        for (int i=0; i<current->key->nsucc; i++) {
-
-            long index_neighbor = current->key->successors[i];
-            double distance = distance_between_two_points(*(current->key), *nodes[index_neighbor]);
-            estimated_g = *g[current->key->index] + distance;
-            if (estimated_g < *g[index_neighbor]) { // This path is better than previous one
-                
-                *trace[index_neighbor] = current->key->index;
-                *g[index_neighbor] = estimated_g;
-
-                // Check neighbor is in openlist
-                // if yes, update neighbor f
-                // if no, insert into queue
-                double neighbor_h = distance_between_two_points(*nodes[index_neighbor], *goal);
-                struct QNode *neighbor_qnode_in_q = is_node_in_open_list(q, *nodes[index_neighbor]);
-                if (neighbor_qnode_in_q != NULL) {
-                    neighbor_qnode_in_q->f = *g[index_neighbor] + neighbor_h;
-                } else {
-                    double neighbor_f = *g[index_neighbor] + neighbor_h;
-                    struct QNode *neighbor_qnode = new_qnode(neighbor_f, neighbor_h, (*nodes + index_neighbor));
-                    import_queue(q, neighbor_qnode);
-                }
-
-            }
-
-        }
-
-    }
-
-}
+// Convert degree to radians
+double convert_radians(double degree);
+// Check if node is in open list
+struct QNode *is_node_in_open_list(open *q, node n);
+// A-star
+void a_start(node *source, node *goal, open *q, int **trace, double **g, unsigned int amount_nodes, node **nodes);
 
 
 int main(int argc, char **argv) {
 
     char *file_name = cataluna_map;
     node *nodes = NULL;
-    int amount_nodes = 0;
+    unsigned int amount_nodes = 0;
     unsigned short *nsuccdim;
-    int *trace;
-    double *g;
+    int *trace = NULL;
+    double *g = NULL;
     open *open_list = create_queue();
 
     if (argc>1 && strcmp(argv[1], "spain") == 0) {
@@ -151,8 +90,18 @@ int main(int argc, char **argv) {
     // allocate trace and g into memory
     trace = (int *) malloc(amount_nodes*sizeof(int));
     g = (double *) malloc(amount_nodes*sizeof(double));
+    // initilize data for trace and g
+    memset(trace, -1, amount_nodes*sizeof(int));
+    memset(g, MAX_DOUBLE, amount_nodes*sizeof(double));
 
     readFile(file_name, &nodes, amount_nodes);
+
+    long barcelona_index = binary_search_node(240949599, nodes, amount_nodes);
+    long sevilla_index = binary_search_node(195977239, nodes, amount_nodes);
+
+    printf("barcelona: %ld, sevilla: %ld\n", barcelona_index, sevilla_index);
+
+    a_start(&nodes[barcelona_index], &nodes[sevilla_index], open_list, &trace, &g, amount_nodes, &nodes);
 
     return 0;
 
@@ -195,7 +144,7 @@ int get_my_line(FILE *fp, char **line, size_t *max_len) {
 
 }
 
-void readFile(char *file_name, node **nodes, int amount_nodes) {
+void readFile(char *file_name, node **nodes, unsigned int amount_nodes) {
 
     FILE *fp = fopen(file_name, "r");
 
@@ -226,7 +175,7 @@ void readFile(char *file_name, node **nodes, int amount_nodes) {
 }
 
 
-void count_nodes(char *file_name, int *amount) {
+void count_nodes(char *file_name, unsigned int *amount) {
 
     FILE *fp = fopen(file_name, "r");
     int begin = 1;
@@ -293,7 +242,7 @@ int proceed_node(char *line, node **nodes, int *current) {
 
 }
 
-int proceed_way(char *line, node **nodes, int amount_nodes) {
+int proceed_way(char *line, node **nodes, unsigned int amount_nodes) {
     
     char *found = NULL;
     found = strsep(&line, "|");
@@ -321,9 +270,9 @@ int proceed_way(char *line, node **nodes, int amount_nodes) {
         default:
             node_id = strtoul(found, &endptr, 10);
             if (first_node == -1) {
-                first_node = binari_search_node(node_id, *nodes, amount_nodes);
+                first_node = binary_search_node(node_id, *nodes, amount_nodes);
             } else {
-                if ((second_node = binari_search_node(node_id, *nodes, amount_nodes)) == -1) {
+                if ((second_node = binary_search_node(node_id, *nodes, amount_nodes)) == -1) {
                     first_node = -1;
                     continue;
                 }
@@ -346,7 +295,7 @@ int proceed_way(char *line, node **nodes, int amount_nodes) {
 
 }
 
-long binari_search_node(unsigned long id, node *nodes, int len_of_node) {
+long binary_search_node(unsigned long id, node *nodes, int len_of_node) {
     int imin = 0;
     int imax = len_of_node - 1;
     while (imax >= imin) {
@@ -356,6 +305,10 @@ long binari_search_node(unsigned long id, node *nodes, int len_of_node) {
         else imax = imid - 1;
     }
     return -1;
+}
+
+double convert_radians(double degree) {
+    return degree*M_PI/180;
 }
 
 void create_way(int first_node, int second_node, node **nodes) {
@@ -372,12 +325,12 @@ void create_way(int first_node, int second_node, node **nodes) {
 
 }
 
-double distance_between_two_points(node first_point, node second_point) {
+double distance_between_two_points(node *first_point, node *second_point) {
 
-    double delta_lat = convert_radians(first_point.lat - second_point.lat);
-    double delta_lon = convert_radians(first_point.lon - second_point.lon);
-    double first_lat = convert_radians(first_point.lat);
-    double second_lat = convert_radians(second_point.lat);
+    double delta_lat = convert_radians(first_point->lat - second_point->lat);
+    double delta_lon = convert_radians(first_point->lon - second_point->lon);
+    double first_lat = convert_radians(first_point->lat);
+    double second_lat = convert_radians(second_point->lat);
 
     double a = sinf(delta_lat/2)*sinf(delta_lat/2) + cosf(first_lat)*cosf(second_lat)*sinf(delta_lon/2)*sinf(delta_lon/2);
     double c = 2*atan2f(sqrtf(a), sqrtf(1-a));
@@ -457,4 +410,75 @@ struct QNode *new_qnode(double f, double h, node *key) {
 int queue_empty(open *q) {
     if (q->front == NULL) return 1;
     return 0;
+}
+
+struct QNode *is_node_in_open_list(open *q, node n) {
+
+    if (q->rear == NULL || q->front == NULL) return 0;
+
+    struct QNode *temp = q->front;
+
+    while (temp->key->id != n.id) {
+        temp = temp->next;
+        if (temp == NULL) return NULL;
+    }
+    return temp;
+
+}
+
+
+void a_start(node *source, node *goal, open *q, int **trace, double **g, unsigned int amount_nodes, node **nodes) {
+
+    struct QNode *current;
+    double estimated_g;
+    double distance;
+    long index_neighbor;
+    double neighbor_h;
+
+    // Create source in queue
+    double source_h = distance_between_two_points(source, goal);
+    double source_f = source_h;
+    struct QNode *source_qnode = new_qnode(source_f, source_h, source);
+    *(*g + source->index) = 0;
+    import_queue(q, source_qnode);
+
+    while (queue_empty(q) == 0) {
+
+        current = de_queue(q);
+
+        if (current->key->id == goal->id) { // Check lai cho nay
+            printf("The lowest cost is %f\n", *(*g + current->key->index));
+            return;
+        }
+
+        for (int i=0; i<current->key->nsucc; i++) {
+
+            index_neighbor = current->key->successors[i];
+            distance = distance_between_two_points(current->key, *nodes + index_neighbor);
+            estimated_g = *(*g + current->key->index) + distance;
+
+            if (estimated_g < *(*g + index_neighbor)) { // This path is better than previous one
+                
+                *(*trace + index_neighbor) = current->key->index;
+                *(*g + index_neighbor) = estimated_g;
+                
+                // Check neighbor is in openlist
+                // if yes, update neighbor f
+                // if no, insert into queue
+                neighbor_h = distance_between_two_points(*nodes + index_neighbor, goal);
+                struct QNode *neighbor_qnode_in_q = is_node_in_open_list(q, *(*nodes + index_neighbor));
+                if (neighbor_qnode_in_q != NULL) {
+                    neighbor_qnode_in_q->f = *(*g + index_neighbor) + neighbor_h;
+                } else {
+                    double neighbor_f = *(*g + index_neighbor) + neighbor_h;
+                    struct QNode *neighbor_qnode = new_qnode(neighbor_f, neighbor_h, *nodes + index_neighbor);
+                    import_queue(q, neighbor_qnode);
+                }
+
+            }
+
+        }
+
+    }
+
 }
