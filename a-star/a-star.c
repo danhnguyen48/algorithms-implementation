@@ -35,6 +35,18 @@ typedef struct {
     struct QNode *front, *rear;
 } open;
 
+// Trace
+struct TPoint {
+    unsigned long id;
+    double distance;
+    char *name;
+    struct TPoint *next;
+};
+
+typedef struct {
+    struct TPoint *front, *rear;
+} TraceQueue;
+
 // PROTOCOL
 
 // Gets line by line from file
@@ -46,7 +58,7 @@ void count_nodes(char *file_name, unsigned int *amount);
 // Search node by id
 long binary_search_node(unsigned long id, node *nodes, int len_of_node);
 // Create a way from first to second
-void create_way(int first_node, int second_node, node **nodes);
+void create_way(unsigned long first_node, unsigned long second_node, node **nodes);
 // Store data from file
 int proceed_node(char *line, node **nodes, int *current);
 // Store way data from file
@@ -55,21 +67,122 @@ int proceed_way(char *line, node **nodes, unsigned int amount_nodes);
 double distance_between_two_points(node *first_point, node *second_point);
 // Create open list
 open *create_queue();
-// Import qnode into queue
+// Import qnode into queue following sorted f
 int import_queue(open *q, struct QNode *qnode);
+// Import qnode into queue from top
+int import_top_queue(open *q, struct QNode *qnode);
 // Dequeue queue
 struct QNode *de_queue(open *q);
 // New QNode
 struct QNode *new_qnode(double f, double h, node *key);
 // Check if queue is empty => 1 is empty and 0 is no empty
 int queue_empty(open *q);
+// Remove qnode from list
+struct QNode *remove_qnode_from_list(open *q, struct QNode *qnode);
 // Convert degree to radians
 double convert_radians(double degree);
 // Check if node is in open list
-struct QNode *is_node_in_open_list(open *q, node n);
+struct QNode *is_node_in_list(open *q, node n);
 // A-star
-void a_start(node *source, node *goal, open *q, int **trace, double **g, unsigned int amount_nodes, node **nodes);
+void a_star(node *source, node *goal, open *q, int **trace, double **g, unsigned int amount_nodes, node **nodes);
+// Track ways
+void trace_back(int **trace, double **g, node **nodes, long goal_index, long source_index) {
 
+    TraceQueue *trace_queue = (TraceQueue *) malloc(sizeof(TraceQueue));
+    trace_queue->front = trace_queue->rear = NULL;
+    long index = goal_index;
+    struct TPoint *tpoint = (struct TPoint *) malloc(sizeof(struct TPoint));
+    tpoint->id = (*nodes + index)->id;
+    tpoint->name = (char *) malloc(sizeof((*nodes + index)->name));
+    strcpy(tpoint->name, (*nodes + index)->name);
+    tpoint->distance = *(*g + index);
+    tpoint->next = NULL;
+    trace_queue->front = tpoint;
+    trace_queue->rear = tpoint;
+    while (index != source_index) {
+        index = *(*trace + index);
+        struct TPoint *tp = (struct TPoint *) malloc(sizeof(struct TPoint));
+        tp->id = (*nodes + index)->id;
+        tpoint->name = (char *) malloc(sizeof((*nodes + index)->name));
+        strcpy(tpoint->name, (*nodes + index)->name);
+        tp->distance = *(*g + index);
+        tp->next = trace_queue->front;
+        trace_queue->front = tp;
+    }
+
+    struct TPoint *tp = (struct TPoint *) malloc(sizeof(struct TPoint));
+    tp = trace_queue->front;
+
+    do {
+        printf("Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->id, tp->distance, tp->name);
+        tp = tp->next;
+    } while (tp->id != (*nodes + goal_index)->id || tp->id != trace_queue->rear->id);
+    printf("Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->id, tp->distance, tp->name);
+
+}
+
+void a_star_professor_way(node *source, node *goal,
+                          open *q, open *closed_queue,
+                          int **trace, double **g,
+                          unsigned int amount_nodes, node **nodes) {
+
+    struct QNode *current;
+    double estimated_g;
+    double distance;
+    long index_neighbor;
+    double neighbor_h;
+    struct QNode *neighbor_qnode_in_q, *neighbor_qnode_in_closed;
+
+    // Create source in queue
+    double source_h = distance_between_two_points(source, goal);
+    double source_f = source_h;
+    struct QNode *source_qnode = new_qnode(source_f, source_h, source);
+    *(*g + source->index) = 0;
+    import_queue(q, source_qnode);
+
+    while (queue_empty(q) == 0) {
+        
+        current = de_queue(q);
+        // f-current = g-current + h-current
+        current->f = *(*g + current->key->index) + current->h;
+
+        if (current->key->id == goal->id) {
+            printf("The lowest cost is %f\n", *(*g + current->key->index));
+            trace_back(trace, g, nodes, goal->index, source->index);
+            return;
+        }
+        // Generate each state node_successor that come after node_current
+        for (int i=0; i<current->key->nsucc; i++) {
+
+            index_neighbor = current->key->successors[i];
+            distance = distance_between_two_points(current->key, *nodes + index_neighbor);
+            estimated_g = *(*g + current->key->index) + distance;
+
+            if ((neighbor_qnode_in_q = is_node_in_list(q, *(*nodes + index_neighbor))) != NULL)  { // successor node is in open list
+                if (*(*g + index_neighbor) <= estimated_g) continue;
+            } else if ((neighbor_qnode_in_closed = is_node_in_list(closed_queue, *(*nodes + index_neighbor))) != NULL) { // successor node is in closed list
+                if (*(*g + index_neighbor) <= estimated_g) continue;
+                remove_qnode_from_list(closed_queue, neighbor_qnode_in_closed); // Remove out from closed queue
+                import_queue(q, neighbor_qnode_in_closed); // import into open queue
+            } else {
+                neighbor_h = distance_between_two_points(*nodes + index_neighbor, goal);
+                double neighbor_f = *(*g + index_neighbor) + neighbor_h;
+                struct QNode *neighbor_qnode = new_qnode(neighbor_f, neighbor_h, *nodes + index_neighbor);
+                import_queue(q, neighbor_qnode); // import into open queue
+            }
+
+            *(*g + index_neighbor) = estimated_g;
+            *(*trace + index_neighbor) = current->key->index;
+
+        }
+
+        import_top_queue(closed_queue, current);
+
+    }
+    
+    printf("Cannot find any way to reach goal from source");
+
+}
 
 int main(int argc, char **argv) {
 
@@ -79,7 +192,7 @@ int main(int argc, char **argv) {
     unsigned short *nsuccdim;
     int *trace = NULL;
     double *g = NULL;
-    open *open_list = create_queue();
+    open *open_list = create_queue(), *closed_list = create_queue();
 
     if (argc>1 && strcmp(argv[1], "spain") == 0) {
         file_name = spain_map;
@@ -96,12 +209,52 @@ int main(int argc, char **argv) {
 
     readFile(file_name, &nodes, amount_nodes);
 
-    long barcelona_index = binary_search_node(240949599, nodes, amount_nodes);
-    long sevilla_index = binary_search_node(195977239, nodes, amount_nodes);
-
+    long barcelona_index = binary_search_node(771979683, nodes, amount_nodes);
+    long sevilla_index = binary_search_node(429854583, nodes, amount_nodes);
+    //1541458401
     printf("barcelona: %ld, sevilla: %ld\n", barcelona_index, sevilla_index);
 
-    a_start(&nodes[barcelona_index], &nodes[sevilla_index], open_list, &trace, &g, amount_nodes, &nodes);
+    // a_star(&nodes[barcelona_index], &nodes[sevilla_index], open_list, &trace, &g, amount_nodes, &nodes);
+    a_star_professor_way(&nodes[barcelona_index], &nodes[sevilla_index], open_list, closed_list, &trace, &g, amount_nodes, &nodes);
+
+/*
+    printf("id: 328894 | %lu\nway to: ", (nodes + 328894)->id);
+    for (int i=0; i<(nodes + 328894)->nsucc; i++) {
+        printf("%ld|%lu ", (nodes + 328894)->successors[i], (nodes + (nodes + 328894)->successors[i])->id);
+    }
+    printf("\n");
+
+    printf("id: 328894 | %lu\nway to: ", (nodes + 328894)->id);
+    for (int i=0; i<(nodes + 328894)->nsucc; i++) {
+        printf("%ld|%lu ", (nodes + 328894)->successors[i], (nodes + (nodes + 328894)->successors[i])->id);
+    }
+    printf("\n");
+
+    printf("id: 328893 | %lu\nway to: ", (nodes + 328893)->id);
+    for (int i=0; i<(nodes + 328893)->nsucc; i++) {
+        printf("%ld|%lu ", (nodes + 328893)->successors[i], (nodes + (nodes + 328893)->successors[i])->id);
+    }
+    printf("\n");
+
+    printf("id: 578970 | %lu\nway to: ", (nodes + 578970)->id);
+    for (int i=0; i<(nodes + 578970)->nsucc; i++) {
+        printf("%ld|%lu ", (nodes + 578970)->successors[i], (nodes + (nodes + 578970)->successors[i])->id);
+    }
+    printf("\n");
+
+    printf("id: 578967 | %lu\nway to: ", (nodes + 578967)->id);
+    for (int i=0; i<(nodes + 578967)->nsucc; i++) {
+        printf("%ld|%lu ", (nodes + 578967)->successors[i], (nodes + (nodes + 578967)->successors[i])->id);
+    }
+    printf("\n");
+
+    printf("id: 340604 | %lu\nway to: ", (nodes + 340604)->id);
+    for (int i=0; i<(nodes + 340604)->nsucc; i++) {
+        printf("%ld|%lu ", (nodes + 340604)->successors[i], (nodes + (nodes + 340604)->successors[i])->id);
+    }
+    printf("\n");
+*/
+
 
     return 0;
 
@@ -221,6 +374,7 @@ int proceed_node(char *line, node **nodes, int *current) {
             (*nodes + *current)->id = strtoul(found, &endptr, 10);
             (*nodes + *current)->nsucc = 0;
             (*nodes + *current)->index = *current;
+            (*nodes + *current)->successors = malloc(sizeof(unsigned long));
             break;
         case 2:
             (*nodes + *current)->name = (char *) malloc(strlen(found)*sizeof(char));
@@ -252,16 +406,12 @@ int proceed_way(char *line, node **nodes, unsigned int amount_nodes) {
     int one_way = 1;
     long first_node = -1, second_node = -1;
     unsigned long node_id;
-    unsigned long tempId = 0;
 
     while ((found = strsep(&line, "|")) != NULL) {
         count++;
         switch (count)
         {
-        case 1:
-            tempId = strtoul(found, &endptr, 10);
-            break;
-        case 2:case 3: case 4: case 5: case 6: case 8:
+        case 1:case 2:case 3: case 4: case 5: case 6: case 8:
             break;
         case 7:
             if (strcmp(found, "oneway") == 0) one_way = 1;
@@ -271,6 +421,7 @@ int proceed_way(char *line, node **nodes, unsigned int amount_nodes) {
             node_id = strtoul(found, &endptr, 10);
             if (first_node == -1) {
                 first_node = binary_search_node(node_id, *nodes, amount_nodes);
+                continue;
             } else {
                 if ((second_node = binary_search_node(node_id, *nodes, amount_nodes)) == -1) {
                     first_node = -1;
@@ -311,17 +462,15 @@ double convert_radians(double degree) {
     return degree*M_PI/180;
 }
 
-void create_way(int first_node, int second_node, node **nodes) {
+void create_way(unsigned long first_node, unsigned long second_node, node **nodes) {
 
     // Expand one memory block
-    if ((*nodes + first_node)->nsucc == 0) {
-        (*nodes + first_node)->successors = (unsigned long *) malloc(sizeof(unsigned long));
-    } else {
+    // (*nodes + first_node)->successors = (unsigned long *) malloc(sizeof(unsigned long));
+    if ((*nodes + first_node)->nsucc != 0) {
         (*nodes + first_node)->successors = realloc((*nodes + first_node)->successors, sizeof(unsigned long));
     }
     // Create way from first_node to second_node
-    (*nodes + first_node)->successors[(*nodes + first_node)->nsucc] = second_node;
-    (*nodes + first_node)->nsucc++;
+    (*nodes + first_node)->successors[(*nodes + first_node)->nsucc++] = second_node;
 
 }
 
@@ -334,7 +483,7 @@ double distance_between_two_points(node *first_point, node *second_point) {
 
     double a = sinf(delta_lat/2)*sinf(delta_lat/2) + cosf(first_lat)*cosf(second_lat)*sinf(delta_lon/2)*sinf(delta_lon/2);
     double c = 2*atan2f(sqrtf(a), sqrtf(1-a));
-    double d = EARTH_RADIUS * c;
+    double d = EARTH_RADIUS * c; 
 
     return d;
 
@@ -378,13 +527,26 @@ int import_queue(open *q, struct QNode *qnode) {
 
 }
 
+int import_top_queue(open *q, struct QNode *qnode) {
+
+    if (q->rear == NULL) {
+        q->front = q->rear = qnode;
+        return 1;
+    }
+
+    qnode->next = q->front;
+    q->front = qnode;
+    return 1;
+
+}
+
 struct QNode *de_queue(open *q) {
 
     // Queue empty
     if (q->front == NULL) return NULL;
 
     struct QNode *temp = q->front;
-    free(temp);
+    // free(temp);
     q->front = q->front->next;
 
     // If front NULL, queue will be NULL so change rear to be NULL
@@ -412,7 +574,7 @@ int queue_empty(open *q) {
     return 0;
 }
 
-struct QNode *is_node_in_open_list(open *q, node n) {
+struct QNode *is_node_in_list(open *q, node n) {
 
     if (q->rear == NULL || q->front == NULL) return 0;
 
@@ -422,12 +584,13 @@ struct QNode *is_node_in_open_list(open *q, node n) {
         temp = temp->next;
         if (temp == NULL) return NULL;
     }
+
     return temp;
 
 }
 
 
-void a_start(node *source, node *goal, open *q, int **trace, double **g, unsigned int amount_nodes, node **nodes) {
+void a_star(node *source, node *goal, open *q, int **trace, double **g, unsigned int amount_nodes, node **nodes) {
 
     struct QNode *current;
     double estimated_g;
@@ -446,8 +609,9 @@ void a_start(node *source, node *goal, open *q, int **trace, double **g, unsigne
 
         current = de_queue(q);
 
-        if (current->key->id == goal->id) { // Check lai cho nay
+        if (current->key->id == goal->id) {
             printf("The lowest cost is %f\n", *(*g + current->key->index));
+            trace_back(trace, g, nodes, goal->index, source->index);
             return;
         }
 
@@ -466,7 +630,7 @@ void a_start(node *source, node *goal, open *q, int **trace, double **g, unsigne
                 // if yes, update neighbor f
                 // if no, insert into queue
                 neighbor_h = distance_between_two_points(*nodes + index_neighbor, goal);
-                struct QNode *neighbor_qnode_in_q = is_node_in_open_list(q, *(*nodes + index_neighbor));
+                struct QNode *neighbor_qnode_in_q = is_node_in_list(q, *(*nodes + index_neighbor));
                 if (neighbor_qnode_in_q != NULL) {
                     neighbor_qnode_in_q->f = *(*g + index_neighbor) + neighbor_h;
                 } else {
@@ -482,3 +646,27 @@ void a_start(node *source, node *goal, open *q, int **trace, double **g, unsigne
     }
 
 }
+
+struct QNode *remove_qnode_from_list(open *q, struct QNode *qnode) {
+
+    if (q->front == NULL || q->rear == NULL) return NULL; // List is empty
+
+    struct QNode *temp = q->front;
+    if (temp->key->id == qnode->key->id) { // If qnode is first, use dequeue to remove it
+        // free(temp);
+        return de_queue(q);
+    }
+
+    while (temp->next != NULL && temp->next->key->id != qnode->key->id) {
+        temp = temp->next;
+    }
+
+    if (temp->next == NULL) return NULL; // Not found qnode
+
+    temp->next = temp->next->next; // cut in list, remove qnode from list
+    // free(temp);
+
+    return qnode;
+
+}
+
