@@ -212,8 +212,8 @@ int main(int argc, char **argv) {
     
     printf("barcelona: %ld, sevilla: %ld\n", barcelona_index, sevilla_index);
 
-    // a_star(&nodes[barcelona_index], &nodes[sevilla_index], open_list, &trace, &g, amount_nodes, &nodes);
-    a_star_professor_way(&nodes[barcelona_index], &nodes[sevilla_index], open_list, closed_list, &trace, &g, amount_nodes, &nodes);
+    a_star(&nodes[barcelona_index], &nodes[sevilla_index], open_list, &trace, &g, amount_nodes, &nodes);
+    // a_star_professor_way(&nodes[barcelona_index], &nodes[sevilla_index], open_list, closed_list, &trace, &g, amount_nodes, &nodes);
 
     return 0;
 
@@ -426,12 +426,6 @@ void create_way(unsigned long first_node, unsigned long second_node, node **node
     // Expand one memory block
     struct successor *s = new_successor(second_node);
     import_successor_list((*nodes + first_node)->successor_list, s);
-    // (*nodes + first_node)->successors = (unsigned long *) malloc(sizeof(unsigned long));
-    // if ((*nodes + first_node)->nsucc != 0) {
-    //     (*nodes + first_node)->successors = realloc((*nodes + first_node)->successors, sizeof(unsigned long));
-    // }
-    // Create way from first_node to second_node
-    // (*nodes + first_node)->successors[(*nodes + first_node)->nsucc++] = second_node;
 
 }
 
@@ -562,7 +556,7 @@ struct QNode *is_node_in_list(open *q, node n) {
     return temp;
 
 }
-/*
+
 void a_star(node *source, node *goal, open *q, int **trace, double **g, unsigned int amount_nodes, node **nodes) {
 
     struct QNode *current;
@@ -587,11 +581,12 @@ void a_star(node *source, node *goal, open *q, int **trace, double **g, unsigned
             trace_back(trace, g, nodes, goal->index, source->index);
             return;
         }
+        // Generate each state node_successor that come after node_current
+        struct successor *succ = current->key->successor_list->front;
+        while (succ != NULL) {
 
-        for (int i=0; i<current->key->nsucc; i++) {
-
-            index_neighbor = current->key->successors[i];
-            distance = heuristic_distance_between_two_points(current->key, *nodes + index_neighbor);
+            index_neighbor = succ->index;
+            distance = law_of_cosines_distance(current->key, *nodes + index_neighbor);
             estimated_g = *(*g + current->key->index) + distance;
 
             if (estimated_g < *(*g + index_neighbor)) { // This path is better than previous one
@@ -614,12 +609,14 @@ void a_star(node *source, node *goal, open *q, int **trace, double **g, unsigned
 
             }
 
+            succ = succ->next;
+
         }
 
     }
 
 }
-*/
+
 struct QNode *remove_qnode_from_list(open *q, struct QNode *qnode) {
 
     if (q->front == NULL || q->rear == NULL) return NULL; // List is empty
