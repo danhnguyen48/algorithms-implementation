@@ -72,8 +72,10 @@ void create_way(unsigned long first_node, unsigned long second_node, node **node
 int proceed_node(char *line, node **nodes, int *current);
 // Store way data from file
 int proceed_way(char *line, node **nodes, unsigned int amount_nodes);
-// Calculate distance between two points
-double distance_between_two_points(node *first_point, node *second_point);
+// Calculate heiristic distance between two points
+double heuristic_distance_between_two_points(node *first_point, node *second_point);
+// Calculate real distance between two points
+double law_of_cosines_distance(node *first_point, node *second_point);
 // Create open list
 open *create_queue();
 // Import qnode into queue following sorted f
@@ -116,7 +118,7 @@ void a_star_professor_way(node *source, node *goal,
     struct QNode *neighbor_qnode_in_q, *neighbor_qnode_in_closed;
 
     // Create source in queue
-    double source_h = distance_between_two_points(source, goal);
+    double source_h = heuristic_distance_between_two_points(source, goal);
     double source_f = source_h;
     struct QNode *source_qnode = new_qnode(source_f, source_h, source);
     *(*g + source->index) = 0;
@@ -138,7 +140,7 @@ void a_star_professor_way(node *source, node *goal,
         while (succ != NULL) {
 
             index_neighbor = succ->index;
-            distance = distance_between_two_points(current->key, *nodes + index_neighbor);
+            distance = law_of_cosines_distance(current->key, *nodes + index_neighbor);
             estimated_g = *(*g + current->key->index) + distance;
 
             if ((neighbor_qnode_in_q = is_node_in_list(q, *(*nodes + index_neighbor))) != NULL)  { // successor node is in open list
@@ -154,7 +156,7 @@ void a_star_professor_way(node *source, node *goal,
                 remove_qnode_from_list(closed_queue, neighbor_qnode_in_closed); // Remove out from closed queue
                 import_queue(q, neighbor_qnode_in_closed); // import into open queue
             } else {
-                neighbor_h = distance_between_two_points(*nodes + index_neighbor, goal);
+                neighbor_h = heuristic_distance_between_two_points(*nodes + index_neighbor, goal);
                 double neighbor_f = *(*g + index_neighbor) + neighbor_h;
                 struct QNode *neighbor_qnode = new_qnode(neighbor_f, neighbor_h, *nodes + index_neighbor);
                 import_queue(q, neighbor_qnode); // import into open queue
@@ -433,16 +435,29 @@ void create_way(unsigned long first_node, unsigned long second_node, node **node
 
 }
 
-double distance_between_two_points(node *first_point, node *second_point) {
+double heuristic_distance_between_two_points(node *first_point, node *second_point) {
 
     double delta_lat = convert_radians(first_point->lat - second_point->lat);
     double delta_lon = convert_radians(first_point->lon - second_point->lon);
     double first_lat = convert_radians(first_point->lat);
     double second_lat = convert_radians(second_point->lat);
 
-    double a = sinf(delta_lat/2)*sinf(delta_lat/2) + cosf(first_lat)*cosf(second_lat)*sinf(delta_lon/2)*sinf(delta_lon/2);
-    double c = 2*atan2f(sqrtf(a), sqrtf(1-a));
+    double a = sin(delta_lat/2)*sin(delta_lat/2) + cos(first_lat)*cos(second_lat)*sin(delta_lon/2)*sin(delta_lon/2);
+    double c = 2*atan2(sqrt(a), sqrt(1-a));
     double d = EARTH_RADIUS * c; 
+
+    return d;
+
+}
+
+double law_of_cosines_distance(node *first_point, node *second_point) {
+
+    double lat1 = convert_radians(first_point->lat);
+    double lat2 = convert_radians(second_point->lat);
+    double delta_lon = convert_radians(first_point->lon - second_point->lon);
+    double x = delta_lon * cos((lat1 + lat2)/2);
+    double y = lat1 - lat2;
+    double d = sqrt(x*x + y*y) * EARTH_RADIUS;
 
     return d;
 
@@ -557,7 +572,7 @@ void a_star(node *source, node *goal, open *q, int **trace, double **g, unsigned
     double neighbor_h;
 
     // Create source in queue
-    double source_h = distance_between_two_points(source, goal);
+    double source_h = heuristic_distance_between_two_points(source, goal);
     double source_f = source_h;
     struct QNode *source_qnode = new_qnode(source_f, source_h, source);
     *(*g + source->index) = 0;
@@ -576,7 +591,7 @@ void a_star(node *source, node *goal, open *q, int **trace, double **g, unsigned
         for (int i=0; i<current->key->nsucc; i++) {
 
             index_neighbor = current->key->successors[i];
-            distance = distance_between_two_points(current->key, *nodes + index_neighbor);
+            distance = heuristic_distance_between_two_points(current->key, *nodes + index_neighbor);
             estimated_g = *(*g + current->key->index) + distance;
 
             if (estimated_g < *(*g + index_neighbor)) { // This path is better than previous one
@@ -587,7 +602,7 @@ void a_star(node *source, node *goal, open *q, int **trace, double **g, unsigned
                 // Check neighbor is in openlist
                 // if yes, update neighbor f
                 // if no, insert into queue
-                neighbor_h = distance_between_two_points(*nodes + index_neighbor, goal);
+                neighbor_h = heuristic_distance_between_two_points(*nodes + index_neighbor, goal);
                 struct QNode *neighbor_qnode_in_q = is_node_in_list(q, *(*nodes + index_neighbor));
                 if (neighbor_qnode_in_q != NULL) {
                     neighbor_qnode_in_q->f = *(*g + index_neighbor) + neighbor_h;
