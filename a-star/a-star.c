@@ -15,12 +15,21 @@
 ### Format: relation|@id|@name|@place|@highway|@route|@ref|@oneway|@maxspeed|relation_type|membertype;@id;@role|...
 */
 
+struct successor {
+    unsigned long index;
+    struct successor *next;
+};
+
+typedef struct {
+    struct successor *front, *rear;
+} successor_list;
+
 typedef struct {
     unsigned long id;
     char *name;
     double lat, lon;
     unsigned short nsucc;
-    unsigned long *successors;
+    successor_list *successor_list;
     long index;
 } node;
 
@@ -83,43 +92,16 @@ struct QNode *remove_qnode_from_list(open *q, struct QNode *qnode);
 double convert_radians(double degree);
 // Check if node is in open list
 struct QNode *is_node_in_list(open *q, node n);
+// Create successor linked list
+successor_list *create_successor_list();
+// Import successor list
+int import_successor_list(successor_list *list, struct successor *s);
+// New successor
+struct successor *new_successor(unsigned long neighbor_index);
 // A-star
 void a_star(node *source, node *goal, open *q, int **trace, double **g, unsigned int amount_nodes, node **nodes);
 // Track ways
-void trace_back(int **trace, double **g, node **nodes, long goal_index, long source_index) {
-
-    TraceQueue *trace_queue = (TraceQueue *) malloc(sizeof(TraceQueue));
-    trace_queue->front = trace_queue->rear = NULL;
-    long index = goal_index;
-    struct TPoint *tpoint = (struct TPoint *) malloc(sizeof(struct TPoint));
-    tpoint->id = (*nodes + index)->id;
-    tpoint->name = (char *) malloc(sizeof((*nodes + index)->name));
-    strcpy(tpoint->name, (*nodes + index)->name);
-    tpoint->distance = *(*g + index);
-    tpoint->next = NULL;
-    trace_queue->front = tpoint;
-    trace_queue->rear = tpoint;
-    while (index != source_index) {
-        index = *(*trace + index);
-        struct TPoint *tp = (struct TPoint *) malloc(sizeof(struct TPoint));
-        tp->id = (*nodes + index)->id;
-        tpoint->name = (char *) malloc(sizeof((*nodes + index)->name));
-        strcpy(tpoint->name, (*nodes + index)->name);
-        tp->distance = *(*g + index);
-        tp->next = trace_queue->front;
-        trace_queue->front = tp;
-    }
-
-    struct TPoint *tp = (struct TPoint *) malloc(sizeof(struct TPoint));
-    tp = trace_queue->front;
-
-    do {
-        printf("Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->id, tp->distance, tp->name);
-        tp = tp->next;
-    } while (tp->id != (*nodes + goal_index)->id || tp->id != trace_queue->rear->id);
-    printf("Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->id, tp->distance, tp->name);
-
-}
+void trace_back(int **trace, double **g, node **nodes, long goal_index, long source_index);
 
 void a_star_professor_way(node *source, node *goal,
                           open *q, open *closed_queue,
@@ -129,7 +111,7 @@ void a_star_professor_way(node *source, node *goal,
     struct QNode *current;
     double estimated_g;
     double distance;
-    long index_neighbor;
+    unsigned long index_neighbor;
     double neighbor_h;
     struct QNode *neighbor_qnode_in_q, *neighbor_qnode_in_closed;
 
@@ -152,16 +134,23 @@ void a_star_professor_way(node *source, node *goal,
             return;
         }
         // Generate each state node_successor that come after node_current
-        for (int i=0; i<current->key->nsucc; i++) {
+        struct successor *succ = current->key->successor_list->front;
+        while (succ != NULL) {
 
-            index_neighbor = current->key->successors[i];
+            index_neighbor = succ->index;
             distance = distance_between_two_points(current->key, *nodes + index_neighbor);
             estimated_g = *(*g + current->key->index) + distance;
 
             if ((neighbor_qnode_in_q = is_node_in_list(q, *(*nodes + index_neighbor))) != NULL)  { // successor node is in open list
-                if (*(*g + index_neighbor) <= estimated_g) continue;
+                if (*(*g + index_neighbor) <= estimated_g) {
+                    succ = succ->next; //  Comes next
+                    continue;
+                }
             } else if ((neighbor_qnode_in_closed = is_node_in_list(closed_queue, *(*nodes + index_neighbor))) != NULL) { // successor node is in closed list
-                if (*(*g + index_neighbor) <= estimated_g) continue;
+                if (*(*g + index_neighbor) <= estimated_g) {
+                    succ = succ->next; //  Comes next
+                    continue;
+                }
                 remove_qnode_from_list(closed_queue, neighbor_qnode_in_closed); // Remove out from closed queue
                 import_queue(q, neighbor_qnode_in_closed); // import into open queue
             } else {
@@ -173,6 +162,9 @@ void a_star_professor_way(node *source, node *goal,
 
             *(*g + index_neighbor) = estimated_g;
             *(*trace + index_neighbor) = current->key->index;
+
+            // Comes next
+            succ = succ->next;
 
         }
 
@@ -193,9 +185,13 @@ int main(int argc, char **argv) {
     int *trace = NULL;
     double *g = NULL;
     open *open_list = create_queue(), *closed_list = create_queue();
+    unsigned long source_id = 771979683;
+    unsigned long goal_id = 429854583;
 
     if (argc>1 && strcmp(argv[1], "spain") == 0) {
         file_name = spain_map;
+        source_id = 240949599;
+        goal_id = 195977239;
     }
 
     count_nodes(file_name, &amount_nodes);
@@ -209,52 +205,13 @@ int main(int argc, char **argv) {
 
     readFile(file_name, &nodes, amount_nodes);
 
-    long barcelona_index = binary_search_node(771979683, nodes, amount_nodes);
-    long sevilla_index = binary_search_node(429854583, nodes, amount_nodes);
-    //1541458401
+    long barcelona_index = binary_search_node(source_id, nodes, amount_nodes);
+    long sevilla_index = binary_search_node(goal_id, nodes, amount_nodes);
+    
     printf("barcelona: %ld, sevilla: %ld\n", barcelona_index, sevilla_index);
 
     // a_star(&nodes[barcelona_index], &nodes[sevilla_index], open_list, &trace, &g, amount_nodes, &nodes);
     a_star_professor_way(&nodes[barcelona_index], &nodes[sevilla_index], open_list, closed_list, &trace, &g, amount_nodes, &nodes);
-
-/*
-    printf("id: 328894 | %lu\nway to: ", (nodes + 328894)->id);
-    for (int i=0; i<(nodes + 328894)->nsucc; i++) {
-        printf("%ld|%lu ", (nodes + 328894)->successors[i], (nodes + (nodes + 328894)->successors[i])->id);
-    }
-    printf("\n");
-
-    printf("id: 328894 | %lu\nway to: ", (nodes + 328894)->id);
-    for (int i=0; i<(nodes + 328894)->nsucc; i++) {
-        printf("%ld|%lu ", (nodes + 328894)->successors[i], (nodes + (nodes + 328894)->successors[i])->id);
-    }
-    printf("\n");
-
-    printf("id: 328893 | %lu\nway to: ", (nodes + 328893)->id);
-    for (int i=0; i<(nodes + 328893)->nsucc; i++) {
-        printf("%ld|%lu ", (nodes + 328893)->successors[i], (nodes + (nodes + 328893)->successors[i])->id);
-    }
-    printf("\n");
-
-    printf("id: 578970 | %lu\nway to: ", (nodes + 578970)->id);
-    for (int i=0; i<(nodes + 578970)->nsucc; i++) {
-        printf("%ld|%lu ", (nodes + 578970)->successors[i], (nodes + (nodes + 578970)->successors[i])->id);
-    }
-    printf("\n");
-
-    printf("id: 578967 | %lu\nway to: ", (nodes + 578967)->id);
-    for (int i=0; i<(nodes + 578967)->nsucc; i++) {
-        printf("%ld|%lu ", (nodes + 578967)->successors[i], (nodes + (nodes + 578967)->successors[i])->id);
-    }
-    printf("\n");
-
-    printf("id: 340604 | %lu\nway to: ", (nodes + 340604)->id);
-    for (int i=0; i<(nodes + 340604)->nsucc; i++) {
-        printf("%ld|%lu ", (nodes + 340604)->successors[i], (nodes + (nodes + 340604)->successors[i])->id);
-    }
-    printf("\n");
-*/
-
 
     return 0;
 
@@ -374,7 +331,7 @@ int proceed_node(char *line, node **nodes, int *current) {
             (*nodes + *current)->id = strtoul(found, &endptr, 10);
             (*nodes + *current)->nsucc = 0;
             (*nodes + *current)->index = *current;
-            (*nodes + *current)->successors = malloc(sizeof(unsigned long));
+            (*nodes + *current)->successor_list = create_successor_list();
             break;
         case 2:
             (*nodes + *current)->name = (char *) malloc(strlen(found)*sizeof(char));
@@ -465,12 +422,14 @@ double convert_radians(double degree) {
 void create_way(unsigned long first_node, unsigned long second_node, node **nodes) {
 
     // Expand one memory block
+    struct successor *s = new_successor(second_node);
+    import_successor_list((*nodes + first_node)->successor_list, s);
     // (*nodes + first_node)->successors = (unsigned long *) malloc(sizeof(unsigned long));
-    if ((*nodes + first_node)->nsucc != 0) {
-        (*nodes + first_node)->successors = realloc((*nodes + first_node)->successors, sizeof(unsigned long));
-    }
+    // if ((*nodes + first_node)->nsucc != 0) {
+    //     (*nodes + first_node)->successors = realloc((*nodes + first_node)->successors, sizeof(unsigned long));
+    // }
     // Create way from first_node to second_node
-    (*nodes + first_node)->successors[(*nodes + first_node)->nsucc++] = second_node;
+    // (*nodes + first_node)->successors[(*nodes + first_node)->nsucc++] = second_node;
 
 }
 
@@ -588,8 +547,7 @@ struct QNode *is_node_in_list(open *q, node n) {
     return temp;
 
 }
-
-
+/*
 void a_star(node *source, node *goal, open *q, int **trace, double **g, unsigned int amount_nodes, node **nodes) {
 
     struct QNode *current;
@@ -646,7 +604,7 @@ void a_star(node *source, node *goal, open *q, int **trace, double **g, unsigned
     }
 
 }
-
+*/
 struct QNode *remove_qnode_from_list(open *q, struct QNode *qnode) {
 
     if (q->front == NULL || q->rear == NULL) return NULL; // List is empty
@@ -667,6 +625,72 @@ struct QNode *remove_qnode_from_list(open *q, struct QNode *qnode) {
     // free(temp);
 
     return qnode;
+
+}
+
+successor_list *create_successor_list() {
+    successor_list *sl = (successor_list *) malloc(sizeof(successor_list));
+    sl->front = sl->rear = NULL;
+    return sl;
+}
+
+int import_successor_list(successor_list *list, struct successor *s) {
+
+    if (list->front == NULL || list->rear == NULL) {
+        list->front = s;
+        list->rear = s;
+        return 1;
+    }
+
+    list->rear->next = s;
+    list->rear = s;
+
+    return 1;
+
+}
+
+struct successor *new_successor(unsigned long neighbor_index) {
+
+    struct successor *s = (struct successor *) malloc(sizeof(struct successor));
+    s->index = neighbor_index;
+    s->next = NULL;
+    
+    return s;
+
+}
+
+void trace_back(int **trace, double **g, node **nodes, long goal_index, long source_index) {
+
+    TraceQueue *trace_queue = (TraceQueue *) malloc(sizeof(TraceQueue));
+    trace_queue->front = trace_queue->rear = NULL;
+    long index = goal_index;
+    struct TPoint *tpoint = (struct TPoint *) malloc(sizeof(struct TPoint));
+    tpoint->id = (*nodes + index)->id;
+    tpoint->name = (char *) malloc(sizeof((*nodes + index)->name));
+    tpoint->name = (*nodes + index)->name;
+    tpoint->distance = *(*g + index);
+    tpoint->next = NULL;
+    trace_queue->front = tpoint;
+    trace_queue->rear = tpoint;
+    while (index != source_index) {
+        index = *(*trace + index);
+        struct TPoint *tp = (struct TPoint *) malloc(sizeof(struct TPoint));
+        tp->id = (*nodes + index)->id;
+        tpoint->name = (char *) malloc(sizeof((*nodes + index)->name));
+        tpoint->name = (*nodes + index)->name;
+        tp->distance = *(*g + index);
+        tp->next = trace_queue->front;
+        trace_queue->front = tp;
+    }
+
+    struct TPoint *tp = (struct TPoint *) malloc(sizeof(struct TPoint));
+    tp = trace_queue->front;
+
+    do {
+        printf("Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->id, tp->distance, tp->name);
+        tp = tp->next;
+    } while (tp->id != (*nodes + goal_index)->id || tp->id != trace_queue->rear->id);
+    printf("Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->id, tp->distance, tp->name);
 
 }
 
