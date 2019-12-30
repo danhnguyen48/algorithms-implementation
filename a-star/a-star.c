@@ -8,6 +8,7 @@
 #define CHUNK_READING_SIZE 128
 #define EARTH_RADIUS 6371000
 #define MAX_DOUBLE 66.9
+#define OUTPUT_FILE "a-star-output.txt"
 
 /*
 ### Format: node|@id|@name|@place|@highway|@route|@ref|@oneway|@maxspeed|node_lat|node_lon
@@ -101,14 +102,14 @@ int import_successor_list(successor_list *list, struct successor *s);
 // New successor
 struct successor *new_successor(unsigned long neighbor_index);
 // A-star
-void a_star(node *source, node *goal, open *q, int **trace, double **g, unsigned int amount_nodes, node **nodes);
+void a_star(node *source, node *goal, open *q, int **trace, double **g, unsigned int amount_nodes, node **nodes, char *output);
 // Track ways
-void trace_back(int **trace, double **g, node **nodes, long goal_index, long source_index);
+void trace_back(int **trace, double **g, node **nodes, long goal_index, long source_index, char *output);
 
 void a_star_professor_way(node *source, node *goal,
                           open *q, open *closed_queue,
                           int **trace, double **g,
-                          unsigned int amount_nodes, node **nodes) {
+                          unsigned int amount_nodes, node **nodes, char *output) {
 
     struct QNode *current;
     double estimated_g;
@@ -132,7 +133,7 @@ void a_star_professor_way(node *source, node *goal,
 
         if (current->key->id == goal->id) {
             printf("The lowest cost is %f\n", *(*g + current->key->index));
-            trace_back(trace, g, nodes, goal->index, source->index);
+            trace_back(trace, g, nodes, goal->index, source->index, output);
             return;
         }
         // Generate each state node_successor that come after node_current
@@ -181,6 +182,7 @@ void a_star_professor_way(node *source, node *goal,
 int main(int argc, char **argv) {
 
     char *file_name = cataluna_map;
+    char *output_file = NULL;
     node *nodes = NULL;
     unsigned int amount_nodes = 0;
     unsigned short *nsuccdim;
@@ -194,6 +196,10 @@ int main(int argc, char **argv) {
         file_name = spain_map;
         source_id = 240949599;
         goal_id = 195977239;
+    }
+
+    if (argc>2 && strcmp(argv[2], "file") == 0) {
+        output_file = OUTPUT_FILE;
     }
 
     count_nodes(file_name, &amount_nodes);
@@ -212,8 +218,8 @@ int main(int argc, char **argv) {
     
     printf("barcelona: %ld, sevilla: %ld\n", barcelona_index, sevilla_index);
 
-    a_star(&nodes[barcelona_index], &nodes[sevilla_index], open_list, &trace, &g, amount_nodes, &nodes);
-    // a_star_professor_way(&nodes[barcelona_index], &nodes[sevilla_index], open_list, closed_list, &trace, &g, amount_nodes, &nodes);
+    a_star(&nodes[barcelona_index], &nodes[sevilla_index], open_list, &trace, &g, amount_nodes, &nodes, output_file);
+    // a_star_professor_way(&nodes[barcelona_index], &nodes[sevilla_index], open_list, closed_list, &trace, &g, amount_nodes, &nodes, output_file);
 
     return 0;
 
@@ -557,7 +563,7 @@ struct QNode *is_node_in_list(open *q, node n) {
 
 }
 
-void a_star(node *source, node *goal, open *q, int **trace, double **g, unsigned int amount_nodes, node **nodes) {
+void a_star(node *source, node *goal, open *q, int **trace, double **g, unsigned int amount_nodes, node **nodes, char *output) {
 
     struct QNode *current;
     double estimated_g;
@@ -578,7 +584,7 @@ void a_star(node *source, node *goal, open *q, int **trace, double **g, unsigned
 
         if (current->key->id == goal->id) {
             printf("The lowest cost is %f\n", *(*g + current->key->index));
-            trace_back(trace, g, nodes, goal->index, source->index);
+            trace_back(trace, g, nodes, goal->index, source->index, output);
             return;
         }
         // Generate each state node_successor that come after node_current
@@ -671,7 +677,7 @@ struct successor *new_successor(unsigned long neighbor_index) {
 
 }
 
-void trace_back(int **trace, double **g, node **nodes, long goal_index, long source_index) {
+void trace_back(int **trace, double **g, node **nodes, long goal_index, long source_index, char *output) {
 
     TraceQueue *trace_queue = (TraceQueue *) malloc(sizeof(TraceQueue));
     trace_queue->front = trace_queue->rear = NULL;
@@ -698,11 +704,24 @@ void trace_back(int **trace, double **g, node **nodes, long goal_index, long sou
     struct TPoint *tp = (struct TPoint *) malloc(sizeof(struct TPoint));
     tp = trace_queue->front;
 
+    FILE *fp = NULL;
+    if (output != NULL) {
+        fp = fopen(output, "w");
+    }
+
     do {
-        printf("Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->id, tp->distance, tp->name);
+        if (fp == NULL)
+            printf("Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->id, tp->distance, tp->name);
+        else
+            fprintf(fp, "Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->id, tp->distance, tp->name);
         tp = tp->next;
     } while (tp->id != (*nodes + goal_index)->id || tp->id != trace_queue->rear->id);
-    printf("Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->id, tp->distance, tp->name);
+    if (fp == NULL)
+        printf("Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->id, tp->distance, tp->name);
+    else
+        fprintf(fp, "Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->id, tp->distance, tp->name);
+
+    fclose(fp);
 
 }
 
