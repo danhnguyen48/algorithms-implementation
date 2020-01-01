@@ -9,6 +9,7 @@
 #define EARTH_RADIUS 6371000
 #define MAX_DOUBLE 66.9
 #define OUTPUT_FILE "a-star-output.txt"
+#define BINARY_TEST_FILE "results/binari_test_file.bin"
 
 /*
 ### Format: node|@id|@name|@place|@highway|@route|@ref|@oneway|@maxspeed|node_lat|node_lon
@@ -48,6 +49,7 @@ typedef struct {
 // Trace
 struct TPoint {
     unsigned long id;
+    unsigned long index;
     double distance;
     char *name;
     struct TPoint *next;
@@ -110,6 +112,12 @@ void a_star_professor_way(node *source, node *goal,
 // Track ways
 void trace_back(int **trace, double **g, node **nodes, long goal_index, long source_index, char *output);
 
+// Write and read binary file
+void ExitError(const char *miss, int errcode);
+void write_binary_file_for_testing(node **nodes, unsigned int amount_nodes);
+void read_binary_file_for_testing(unsigned long ***ways, unsigned int *amount_nodes);
+
+
 int main(int argc, char **argv) {
 
     char *file_name = cataluna_map;
@@ -122,6 +130,9 @@ int main(int argc, char **argv) {
     open *open_list = create_queue(), *closed_list = create_queue();
     unsigned long source_id = 771979683;
     unsigned long goal_id = 429854583;
+    // Testing
+    unsigned long **ways;
+    unsigned int test_amount_nodes;
 
     if (argc>1 && strcmp(argv[1], "spain") == 0) {
         file_name = spain_map;
@@ -144,10 +155,46 @@ int main(int argc, char **argv) {
 
     readFile(file_name, &nodes, amount_nodes);
 
+    // write_binary_file_for_testing(&nodes, amount_nodes);
+    // read_binary_file_for_testing(&ways, &test_amount_nodes);
+    
+    // For testing binary file
+    // for (int i=0; i<amount_nodes; i++) {
+    //     struct successor *temp = (nodes + i)->successor_list->front;
+    //     printf("Number successors: %u\n", (nodes + i)->nsucc);
+    //     for (int j=0; j<(nodes + i)->nsucc; j++) {
+    //         printf("%lu %lu\n", temp->index, *(*(ways + i) + j));
+    //         if (temp->index != *(*(ways + i) + j))
+    //             exit(0);
+    //         temp = temp->next;
+    //     }
+    // }
+
     long barcelona_index = binary_search_node(source_id, nodes, amount_nodes);
     long sevilla_index = binary_search_node(goal_id, nodes, amount_nodes);
     
     printf("barcelona: %ld, sevilla: %ld\n", barcelona_index, sevilla_index);
+
+    // char *keyboard = (char *) malloc(32*sizeof(char));
+    // char *endptr;
+    // printf("Enter index: ");
+    // scanf("%s", keyboard);
+    // while (*keyboard != 'e') {
+
+    //     unsigned long index = strtoul(keyboard, &endptr, 10);
+    //     printf("ID: %lu\n", (nodes + index)->id);
+        
+    //     struct successor *temp = (nodes + index)->successor_list->front;
+    //     printf("successor Ids: ");
+    //     while (temp != NULL) {
+    //         printf("%lu, ", (nodes + temp->index)->id);
+    //         temp = temp->next;
+    //     }
+
+    //     printf("\nEnter index: ");
+    //     scanf("%s", keyboard);
+
+    // }
 
     a_star(&nodes[barcelona_index], &nodes[sevilla_index], open_list, &trace, &g, amount_nodes, &nodes, output_file);
     // a_star_professor_way(&nodes[barcelona_index], &nodes[sevilla_index], open_list, closed_list, &trace, &g, amount_nodes, &nodes, output_file);
@@ -363,6 +410,7 @@ void create_way(unsigned long first_node, unsigned long second_node, node **node
     // Expand one memory block
     struct successor *s = new_successor(second_node);
     import_successor_list((*nodes + first_node)->successor_list, s);
+    (*nodes + first_node)->nsucc++;
 
 }
 
@@ -615,6 +663,7 @@ void trace_back(int **trace, double **g, node **nodes, long goal_index, long sou
     long index = goal_index;
     struct TPoint *tpoint = (struct TPoint *) malloc(sizeof(struct TPoint));
     tpoint->id = (*nodes + index)->id;
+    tpoint->index = index;
     tpoint->name = (char *) malloc(sizeof((*nodes + index)->name));
     tpoint->name = (*nodes + index)->name;
     tpoint->distance = *(*g + index);
@@ -625,8 +674,9 @@ void trace_back(int **trace, double **g, node **nodes, long goal_index, long sou
         index = *(*trace + index);
         struct TPoint *tp = (struct TPoint *) malloc(sizeof(struct TPoint));
         tp->id = (*nodes + index)->id;
-        tpoint->name = (char *) malloc(sizeof((*nodes + index)->name));
-        tpoint->name = (*nodes + index)->name;
+        tp->index = index;
+        tp->name = (char *) malloc(sizeof((*nodes + index)->name));
+        tp->name = (*nodes + index)->name;
         tp->distance = *(*g + index);
         tp->next = trace_queue->front;
         trace_queue->front = tp;
@@ -642,15 +692,15 @@ void trace_back(int **trace, double **g, node **nodes, long goal_index, long sou
 
     do {
         if (fp == NULL)
-            printf("Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->id, tp->distance, tp->name);
-        else
-            fprintf(fp, "Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->id, tp->distance, tp->name);
+            printf("Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->index, tp->distance, tp->name);
+        else 
+            fprintf(fp, "Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->index, tp->distance, tp->name);
         tp = tp->next;
     } while (tp->id != (*nodes + goal_index)->id || tp->id != trace_queue->rear->id);
     if (fp == NULL)
-        printf("Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->id, tp->distance, tp->name);
+        printf("Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->index, tp->distance, tp->name);
     else
-        fprintf(fp, "Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->id, tp->distance, tp->name);
+        fprintf(fp, "Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->index, tp->distance, tp->name);
 
     fclose(fp);
 
@@ -728,3 +778,55 @@ void a_star_professor_way(node *source, node *goal,
     printf("Cannot find any way to reach goal from source");
 
 }
+
+void ExitError(const char *miss, int errcode) {
+    fprintf (stderr, "\nERROR: %s.\nStopping...\n\n", miss); exit(errcode);
+}
+
+void write_binary_file_for_testing(node **nodes, unsigned int amount_nodes) {
+
+    unsigned long **ways;
+    FILE *fin;
+    fin = fopen(BINARY_TEST_FILE, "wb");
+    // write number of nodes
+    if (fwrite(&amount_nodes, sizeof(unsigned int), 1, fin) != 1)
+        ExitError("Error when writing the amount of nodes", 31);
+    ways = (unsigned long **) malloc(amount_nodes*sizeof(unsigned long *));
+    for (int i=0; i<amount_nodes; i++) {
+        *(ways + i) = (unsigned long *) malloc((*nodes + i)->nsucc * sizeof(unsigned long));
+        struct successor *temp = (*nodes + i)->successor_list->front;
+        for (int j=0; j<(*nodes + i)->nsucc; j++) {
+            // *(*(ways + i) + j) = (*nodes + temp->index)->id; Write Id
+            *(*(ways + i) + j) = temp->index; // Write index
+            temp = temp->next;
+        }
+        if (fwrite(&(*nodes + i)->nsucc, sizeof(unsigned short), 1, fin) != 1)
+            ExitError("Error when writing the number of successor", 32);
+        if (fwrite(*(ways + i), sizeof(unsigned long), (*nodes + i)->nsucc, fin) != (*nodes + i)->nsucc)
+            ExitError("Error when writing the ways", 32);
+    }
+    fclose(fin);
+
+}
+
+void read_binary_file_for_testing(unsigned long ***ways, unsigned int *amount_nodes) {
+
+    FILE *fout;
+    unsigned short *nsucc = malloc(sizeof(unsigned short));
+    fout = fopen(BINARY_TEST_FILE, "rb");
+    if (fread(amount_nodes, sizeof(unsigned int), 1, fout) != 1)
+        ExitError("Error when reading the amount of nodes", 31);
+    
+    *ways = (unsigned long **) malloc(*amount_nodes * sizeof(unsigned long *));
+    for (int i=0; i<*amount_nodes; i++) {
+        if (fread(nsucc, sizeof(unsigned short), 1, fout) != 1)
+            ExitError("Error when reading the number of successor", 32);
+        
+        *(*ways + i) = (unsigned long *) malloc(*nsucc * sizeof(unsigned long));
+        if (fread(*(*ways + i), sizeof(unsigned long), *nsucc, fout) != *nsucc)
+            ExitError("Error when reading the ways", 32);
+    }
+    fclose(fout);
+
+}
+
