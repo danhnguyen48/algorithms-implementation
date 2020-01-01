@@ -155,7 +155,7 @@ int main(int argc, char **argv) {
 
     readFile(file_name, &nodes, amount_nodes);
 
-    // write_binary_file_for_testing(&nodes, amount_nodes);
+    write_binary_file_for_testing(&nodes, amount_nodes);
     // read_binary_file_for_testing(&ways, &test_amount_nodes);
     
     // For testing binary file
@@ -196,7 +196,7 @@ int main(int argc, char **argv) {
 
     // }
 
-    a_star(&nodes[barcelona_index], &nodes[sevilla_index], open_list, &trace, &g, amount_nodes, &nodes, output_file);
+    // a_star(&nodes[barcelona_index], &nodes[sevilla_index], open_list, &trace, &g, amount_nodes, &nodes, output_file);
     // a_star_professor_way(&nodes[barcelona_index], &nodes[sevilla_index], open_list, closed_list, &trace, &g, amount_nodes, &nodes, output_file);
 
     return 0;
@@ -785,15 +785,15 @@ void ExitError(const char *miss, int errcode) {
 
 void write_binary_file_for_testing(node **nodes, unsigned int amount_nodes) {
 
-    unsigned long **ways;
+    unsigned int **ways;
     FILE *fin;
     fin = fopen(BINARY_TEST_FILE, "wb");
     // write number of nodes
     if (fwrite(&amount_nodes, sizeof(unsigned int), 1, fin) != 1)
         ExitError("Error when writing the amount of nodes", 31);
-    ways = (unsigned long **) malloc(amount_nodes*sizeof(unsigned long *));
+    ways = (unsigned int **) malloc(amount_nodes*sizeof(unsigned int *));
     for (int i=0; i<amount_nodes; i++) {
-        *(ways + i) = (unsigned long *) malloc((*nodes + i)->nsucc * sizeof(unsigned long));
+        *(ways + i) = (unsigned int *) malloc((*nodes + i)->nsucc * sizeof(unsigned int));
         struct successor *temp = (*nodes + i)->successor_list->front;
         for (int j=0; j<(*nodes + i)->nsucc; j++) {
             // *(*(ways + i) + j) = (*nodes + temp->index)->id; Write Id
@@ -802,7 +802,7 @@ void write_binary_file_for_testing(node **nodes, unsigned int amount_nodes) {
         }
         if (fwrite(&(*nodes + i)->nsucc, sizeof(unsigned short), 1, fin) != 1)
             ExitError("Error when writing the number of successor", 32);
-        if (fwrite(*(ways + i), sizeof(unsigned long), (*nodes + i)->nsucc, fin) != (*nodes + i)->nsucc)
+        if (fwrite(*(ways + i), sizeof(unsigned int), (*nodes + i)->nsucc, fin) != (*nodes + i)->nsucc)
             ExitError("Error when writing the ways", 32);
     }
     fclose(fin);
