@@ -694,13 +694,13 @@ void trace_back(int **trace, double **g, node **nodes, long goal_index, long sou
         if (fp == NULL)
             printf("Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->index, tp->distance, tp->name);
         else 
-            fprintf(fp, "Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->index, tp->distance, tp->name);
+            fprintf(fp, "Index: %lu | Node id: %lu | Distance: %f | Name: %s \n", tp->index, tp->id, tp->distance, tp->name);
         tp = tp->next;
     } while (tp->id != (*nodes + goal_index)->id || tp->id != trace_queue->rear->id);
     if (fp == NULL)
         printf("Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->index, tp->distance, tp->name);
     else
-        fprintf(fp, "Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->index, tp->distance, tp->name);
+        fprintf(fp, "Index: %lu | Node id: %lu | Distance: %f | Name: %s \n", tp->index, tp->id, tp->distance, tp->name);
 
     fclose(fp);
 
