@@ -8,7 +8,7 @@
 
 // Write and read binary file
 void ExitError(const char *miss, int errcode);
-void read_binary_file_for_testing(unsigned long ***ways, unsigned int *amount_nodes, unsigned int **nsuccs);
+void read_binary_file_for_testing(unsigned long ***ways, unsigned int *amount_nodes, unsigned int **nsuccs, char *binary_file);
 
 int haveWay(unsigned long ***ways, unsigned int **nsuccs, unsigned long firstIndex, unsigned long secondIndex) {
 
@@ -23,7 +23,7 @@ int haveWay(unsigned long ***ways, unsigned int **nsuccs, unsigned long firstInd
 
 }
 
-int test(unsigned long ***ways, unsigned int *amount_nodes, unsigned int **nsuccs) {
+int test(unsigned long ***ways, unsigned int *amount_nodes, unsigned int **nsuccs, char *file_name) {
 
     FILE *fp;
     char *endptr;
@@ -32,7 +32,14 @@ int test(unsigned long ***ways, unsigned int *amount_nodes, unsigned int **nsucc
     int success = 1;
     firstPair = (char *) malloc(32*sizeof(char));
     lastPair = (char *) malloc(32*sizeof(char));
-    fp = fopen(RESULT_FILE, "r");
+    if (file_name == NULL) {
+        printf("Uploaded file not found!\n");
+        exit(0);
+    } else
+    if ((fp = fopen(file_name, "r")) == NULL) {
+        printf("Cannot read the uploaded file!\n");
+        exit(0);
+    }
     fgets(chunk, sizeof(chunk), fp);
     memcpy(firstPair, chunk, strlen(chunk));
     while (fgets(chunk, sizeof(chunk), fp) != NULL) {
@@ -44,7 +51,7 @@ int test(unsigned long ***ways, unsigned int *amount_nodes, unsigned int **nsucc
         if (strlen(lastPair) == 1) continue;
 
         if (haveWay(ways, nsuccs, firstIndex, secondIndex) == 0) {
-            printf("Cannot find the way from index %lu to %lu\n", firstIndex, secondIndex);
+            printf("Do not find the way from index %lu to %lu\n", firstIndex, secondIndex);
             success = 0;
             break;
         }
@@ -63,9 +70,19 @@ int main(int argc, char **argv) {
     unsigned long **ways;
     unsigned int amount_nodes = 0;
     unsigned int *nsuccs;
+    char *file_name;
+    char *binary_file;
 
-    read_binary_file_for_testing(&ways, &amount_nodes, &nsuccs);
-    if (test(&ways, &amount_nodes, &nsuccs) == 1) {
+    if (argc < 2) {
+        printf("Parameter missing!\n");
+        exit(0);
+    } else {
+        file_name = argv[1];
+        binary_file = argv[2];
+    }
+
+    read_binary_file_for_testing(&ways, &amount_nodes, &nsuccs, binary_file);
+    if (test(&ways, &amount_nodes, &nsuccs, file_name) == 1) {
         printf("All ways are connected!\n");
     }
 
@@ -78,11 +95,14 @@ void ExitError(const char *miss, int errcode) {
     fprintf (stderr, "\nERROR: %s.\nStopping...\n\n", miss); exit(errcode);
 }
 
-void read_binary_file_for_testing(unsigned long ***ways, unsigned int *amount_nodes, unsigned int **nsuccs) {
+void read_binary_file_for_testing(unsigned long ***ways, unsigned int *amount_nodes, unsigned int **nsuccs, char *binary_file) {
 
     FILE *fout;
     unsigned short *nsucc = malloc(sizeof(unsigned short));
-    fout = fopen(BINARY_TEST_FILE, "rb");
+    if (binary_file == NULL || (fout = fopen(binary_file, "rb")) == NULL) {
+        printf("Cannot read source file from system!\n");
+        exit(0);
+    }
     if (fread(amount_nodes, sizeof(unsigned int), 1, fout) != 1)
         ExitError("Error when reading the amount of nodes", 31);
     
