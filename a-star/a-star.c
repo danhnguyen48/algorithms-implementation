@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
+#include <time.h>
 
 #define cataluna_map "cataluna.csv"
 #define spain_map "spain.csv"
@@ -122,6 +123,10 @@ int main(int argc, char **argv) {
     open *open_list = create_queue(), *closed_list = create_queue();
     unsigned long source_id = 771979683;
     unsigned long goal_id = 429854583;
+    clock_t start, end;
+    double cpu_time_used;
+
+    start = clock();
 
     if (argc>1 && strcmp(argv[1], "spain") == 0) {
         file_name = spain_map;
@@ -147,10 +152,20 @@ int main(int argc, char **argv) {
     long barcelona_index = binary_search_node(source_id, nodes, amount_nodes);
     long sevilla_index = binary_search_node(goal_id, nodes, amount_nodes);
     
+    end = clock();
+    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+
+    printf("Reading Time: %f\n", cpu_time_used);
+
     printf("barcelona: %ld, sevilla: %ld\n", barcelona_index, sevilla_index);
 
     a_star(&nodes[barcelona_index], &nodes[sevilla_index], open_list, &trace, &g, amount_nodes, &nodes, output_file);
     // a_star_professor_way(&nodes[barcelona_index], &nodes[sevilla_index], open_list, closed_list, &trace, &g, amount_nodes, &nodes, output_file);
+
+    end = clock();
+    cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+
+    printf("All Time: %f\n", cpu_time_used);
 
     return 0;
 
