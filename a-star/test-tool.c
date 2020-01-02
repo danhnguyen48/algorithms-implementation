@@ -8,9 +8,9 @@
 
 // Write and read binary file
 void ExitError(const char *miss, int errcode);
-void read_binary_file_for_testing(unsigned long ***ways, unsigned int *amount_nodes, unsigned int **nsuccs, char *binary_file);
+void read_binary_file_for_testing(unsigned int ***ways, unsigned int *amount_nodes, unsigned short **nsuccs, char *binary_file);
 
-int haveWay(unsigned long ***ways, unsigned int **nsuccs, unsigned long firstIndex, unsigned long secondIndex) {
+int haveWay(unsigned int ***ways, unsigned short **nsuccs, unsigned long firstIndex, unsigned long secondIndex) {
 
     for (int i=0; i<*(*nsuccs + firstIndex); i++) {
 
@@ -23,15 +23,15 @@ int haveWay(unsigned long ***ways, unsigned int **nsuccs, unsigned long firstInd
 
 }
 
-int test(unsigned long ***ways, unsigned int *amount_nodes, unsigned int **nsuccs, char *file_name) {
+int test(unsigned int ***ways, unsigned int *amount_nodes, unsigned short **nsuccs, char *file_name) {
 
     FILE *fp;
     char *endptr;
     char *firstPair, *lastPair;
-    char chunk[32];
+    char chunk[12];
     int success = 1;
-    firstPair = (char *) malloc(32*sizeof(char));
-    lastPair = (char *) malloc(32*sizeof(char));
+    firstPair = (char *) malloc(12*sizeof(char));
+    lastPair = (char *) malloc(12*sizeof(char));
     if (file_name == NULL) {
         printf("Uploaded file not found!\n");
         exit(0);
@@ -67,9 +67,9 @@ int test(unsigned long ***ways, unsigned int *amount_nodes, unsigned int **nsucc
 
 int main(int argc, char **argv) {
 
-    unsigned long **ways;
+    unsigned int **ways;
     unsigned int amount_nodes = 0;
-    unsigned int *nsuccs;
+    unsigned short *nsuccs;
     char *file_name;
     char *binary_file;
 
@@ -95,7 +95,7 @@ void ExitError(const char *miss, int errcode) {
     fprintf (stderr, "\nERROR: %s.\nStopping...\n\n", miss); exit(errcode);
 }
 
-void read_binary_file_for_testing(unsigned long ***ways, unsigned int *amount_nodes, unsigned int **nsuccs, char *binary_file) {
+void read_binary_file_for_testing(unsigned int ***ways, unsigned int *amount_nodes, unsigned short **nsuccs, char *binary_file) {
 
     FILE *fout;
     unsigned short *nsucc = malloc(sizeof(unsigned short));
@@ -106,15 +106,15 @@ void read_binary_file_for_testing(unsigned long ***ways, unsigned int *amount_no
     if (fread(amount_nodes, sizeof(unsigned int), 1, fout) != 1)
         ExitError("Error when reading the amount of nodes", 31);
     
-    *ways = (unsigned long **) malloc(*amount_nodes * sizeof(unsigned long *));
-    *nsuccs = (unsigned int *) malloc(*amount_nodes * sizeof(unsigned int));
+    *ways = (unsigned int **) malloc(*amount_nodes * sizeof(unsigned int *));
+    *nsuccs = (unsigned short *) malloc(*amount_nodes * sizeof(unsigned short));
     for (int i=0; i<*amount_nodes; i++) {
         if (fread(nsucc, sizeof(unsigned short), 1, fout) != 1)
             ExitError("Error when reading the number of successor", 32);
         *(*nsuccs + i) = *nsucc;
 
-        *(*ways + i) = (unsigned long *) malloc(*nsucc * sizeof(unsigned long));
-        if (fread(*(*ways + i), sizeof(unsigned long), *nsucc, fout) != *nsucc)
+        *(*ways + i) = (unsigned int *) malloc(*nsucc * sizeof(unsigned int));
+        if (fread(*(*ways + i), sizeof(unsigned int), *nsucc, fout) != *nsucc)
             ExitError("Error when reading the ways", 32);
     }
     fclose(fout);
