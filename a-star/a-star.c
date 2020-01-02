@@ -48,6 +48,7 @@ typedef struct {
 
 // Trace
 struct TPoint {
+    unsigned int index;
     unsigned long id;
     double distance;
     char *name;
@@ -104,10 +105,6 @@ int import_successor_list(successor_list *list, struct successor *s);
 struct successor *new_successor(unsigned long neighbor_index);
 // A-star
 void a_star(node *source, node *goal, open *q, int **trace, double **g, unsigned int amount_nodes, node **nodes, char *output);
-void a_star_professor_way(node *source, node *goal,
-                          open *q, open *closed_queue,
-                          int **trace, double **g,
-                          unsigned int amount_nodes, node **nodes, char *output);
 // Track ways
 void trace_back(int **trace, double **g, node **nodes, long goal_index, long source_index, char *output);
 
@@ -117,10 +114,9 @@ int main(int argc, char **argv) {
     char *output_file = NULL;
     node *nodes = NULL;
     unsigned int amount_nodes = 0;
-    unsigned short *nsuccdim;
     int *trace = NULL;
     double *g = NULL;
-    open *open_list = create_queue(), *closed_list = create_queue();
+    open *open_list = create_queue();
     unsigned long source_id = 771979683;
     unsigned long goal_id = 429854583;
     clock_t start, end;
@@ -160,7 +156,6 @@ int main(int argc, char **argv) {
     printf("barcelona: %ld, sevilla: %ld\n", barcelona_index, sevilla_index);
 
     a_star(&nodes[barcelona_index], &nodes[sevilla_index], open_list, &trace, &g, amount_nodes, &nodes, output_file);
-    // a_star_professor_way(&nodes[barcelona_index], &nodes[sevilla_index], open_list, closed_list, &trace, &g, amount_nodes, &nodes, output_file);
 
     end = clock();
     cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
@@ -499,13 +494,23 @@ struct QNode *is_node_in_list(open *q, node n) {
     if (q->rear == NULL || q->front == NULL) return 0;
 
     struct QNode *temp = q->front;
-
-    while (temp->key->id != n.id) {
-        temp = temp->next;
-        if (temp == NULL) return NULL;
+    if (temp->key->id == n.id) {
+        q->front = temp->next;
+        return temp;
     }
 
-    return temp;
+    while (temp->next != NULL) {
+        if (temp->next->key->id == n.id) {
+            struct QNode *n = temp->next; // store pointer which is needed to return
+            temp->next = n->next; // remove n from queue
+            if (temp->next == NULL) 
+                q->rear = temp; // If the qnode after the needed node is null, the before qnode will be the rear
+            return n;
+        }
+        temp = temp->next;
+    }
+
+    return NULL;
 
 }
 
@@ -549,11 +554,13 @@ void a_star(node *source, node *goal, open *q, int **trace, double **g, unsigned
                 // Check neighbor is in openlist
                 // if yes, update neighbor f
                 // if no, insert into queue
-                neighbor_h = heuristic_distance_between_two_points(*nodes + index_neighbor, goal);
-                struct QNode *neighbor_qnode_in_q = is_node_in_list(q, *(*nodes + index_neighbor));
+                struct QNode *neighbor_qnode_in_q = is_node_in_list(q, *(*nodes + index_neighbor)); // Check and dequeue this qnode
                 if (neighbor_qnode_in_q != NULL) {
-                    neighbor_qnode_in_q->f = *(*g + index_neighbor) + neighbor_h;
+                    neighbor_qnode_in_q->f = *(*g + index_neighbor) + neighbor_qnode_in_q->h;
+                    // Update position
+                    import_queue(q, neighbor_qnode_in_q);
                 } else {
+                    neighbor_h = heuristic_distance_between_two_points(*nodes + index_neighbor, goal);
                     double neighbor_f = *(*g + index_neighbor) + neighbor_h;
                     struct QNode *neighbor_qnode = new_qnode(neighbor_f, neighbor_h, *nodes + index_neighbor);
                     import_queue(q, neighbor_qnode);
@@ -630,6 +637,7 @@ void trace_back(int **trace, double **g, node **nodes, long goal_index, long sou
     long index = goal_index;
     struct TPoint *tpoint = (struct TPoint *) malloc(sizeof(struct TPoint));
     tpoint->id = (*nodes + index)->id;
+    tpoint->index = index;
     tpoint->name = (char *) malloc(sizeof((*nodes + index)->name));
     tpoint->name = (*nodes + index)->name;
     tpoint->distance = *(*g + index);
@@ -640,8 +648,9 @@ void trace_back(int **trace, double **g, node **nodes, long goal_index, long sou
         index = *(*trace + index);
         struct TPoint *tp = (struct TPoint *) malloc(sizeof(struct TPoint));
         tp->id = (*nodes + index)->id;
-        tpoint->name = (char *) malloc(sizeof((*nodes + index)->name));
-        tpoint->name = (*nodes + index)->name;
+        tp->index = index;
+        tp->name = (char *) malloc(sizeof((*nodes + index)->name));
+        tp->name = (*nodes + index)->name;
         tp->distance = *(*g + index);
         tp->next = trace_queue->front;
         trace_queue->front = tp;
@@ -660,86 +669,15 @@ void trace_back(int **trace, double **g, node **nodes, long goal_index, long sou
             printf("Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->id, tp->distance, tp->name);
         else
             fprintf(fp, "Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->id, tp->distance, tp->name);
+            // fprintf(fp, "Index: %u | Node id: %lu | Distance: %f | Name: %s\n", tp->index, tp->id, tp->distance, tp->name);
         tp = tp->next;
     } while (tp->id != (*nodes + goal_index)->id || tp->id != trace_queue->rear->id);
     if (fp == NULL)
         printf("Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->id, tp->distance, tp->name);
     else
         fprintf(fp, "Node id: %lu\t| Distance: %f  \t| Name: %s\n", tp->id, tp->distance, tp->name);
+        // fprintf(fp, "Index: %u | Node id: %lu | Distance: %f | Name: %s\n", tp->index, tp->id, tp->distance, tp->name);
 
     fclose(fp);
-
-}
-
-void a_star_professor_way(node *source, node *goal,
-                          open *q, open *closed_queue,
-                          int **trace, double **g,
-                          unsigned int amount_nodes, node **nodes, char *output) {
-
-    struct QNode *current;
-    double estimated_g;
-    double distance;
-    unsigned long index_neighbor;
-    double neighbor_h;
-    struct QNode *neighbor_qnode_in_q, *neighbor_qnode_in_closed;
-
-    // Create source in queue
-    double source_h = heuristic_distance_between_two_points(source, goal);
-    double source_f = source_h;
-    struct QNode *source_qnode = new_qnode(source_f, source_h, source);
-    *(*g + source->index) = 0;
-    import_queue(q, source_qnode);
-
-    while (queue_empty(q) == 0) {
-        
-        current = de_queue(q);
-        // f-current = g-current + h-current
-        current->f = *(*g + current->key->index) + current->h;
-
-        if (current->key->id == goal->id) {
-            printf("The lowest cost is %f\n", *(*g + current->key->index));
-            trace_back(trace, g, nodes, goal->index, source->index, output);
-            return;
-        }
-        // Generate each state node_successor that come after node_current
-        struct successor *succ = current->key->successor_list->front;
-        while (succ != NULL) {
-
-            index_neighbor = succ->index;
-            distance = law_of_cosines_distance(current->key, *nodes + index_neighbor);
-            estimated_g = *(*g + current->key->index) + distance;
-
-            if ((neighbor_qnode_in_q = is_node_in_list(q, *(*nodes + index_neighbor))) != NULL)  { // successor node is in open list
-                if (*(*g + index_neighbor) <= estimated_g) {
-                    succ = succ->next; //  Comes next
-                    continue;
-                }
-            } else if ((neighbor_qnode_in_closed = is_node_in_list(closed_queue, *(*nodes + index_neighbor))) != NULL) { // successor node is in closed list
-                if (*(*g + index_neighbor) <= estimated_g) {
-                    succ = succ->next; //  Comes next
-                    continue;
-                }
-                remove_qnode_from_list(closed_queue, neighbor_qnode_in_closed); // Remove out from closed queue
-                import_queue(q, neighbor_qnode_in_closed); // import into open queue
-            } else {
-                neighbor_h = heuristic_distance_between_two_points(*nodes + index_neighbor, goal);
-                double neighbor_f = *(*g + index_neighbor) + neighbor_h;
-                struct QNode *neighbor_qnode = new_qnode(neighbor_f, neighbor_h, *nodes + index_neighbor);
-                import_queue(q, neighbor_qnode); // import into open queue
-            }
-
-            *(*g + index_neighbor) = estimated_g;
-            *(*trace + index_neighbor) = current->key->index;
-
-            // Comes next
-            succ = succ->next;
-
-        }
-
-        import_top_queue(closed_queue, current);
-
-    }
-    
-    printf("Cannot find any way to reach goal from source");
 
 }
