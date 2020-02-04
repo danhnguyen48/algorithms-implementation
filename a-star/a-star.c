@@ -79,7 +79,7 @@ int proceed_way(char *line, node **nodes, unsigned int amount_nodes);
 // Calculate heiristic distance between two points
 double heuristic_distance_between_two_points(node *first_point, node *second_point);
 // Calculate real distance between two points
-double law_of_cosines_distance(node *first_point, node *second_point);
+double equirectangular_approximation(node *first_point, node *second_point);
 // Create open list
 open *create_queue();
 // Import qnode into queue following sorted f
@@ -380,7 +380,7 @@ double heuristic_distance_between_two_points(node *first_point, node *second_poi
 
 }
 
-double law_of_cosines_distance(node *first_point, node *second_point) {
+double equirectangular_approximation(node *first_point, node *second_point) {
 
     double lat1 = convert_radians(first_point->lat);
     double lat2 = convert_radians(second_point->lat);
@@ -524,7 +524,7 @@ void a_star(node *source, node *goal, open *q, unsigned int amount_nodes, node *
         while (succ != NULL) {
 
             index_neighbor = succ->index;
-            distance = law_of_cosines_distance(current->key, *nodes + index_neighbor);
+            distance = equirectangular_approximation(current->key, *nodes + index_neighbor);
             estimated_g = current->g + distance;
 
             if ((*nodes + index_neighbor)->queue_node == NULL || estimated_g < (*nodes + index_neighbor)->queue_node->g) { // This path is better than previous one
