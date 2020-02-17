@@ -2,14 +2,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define tol 1.0e-10
+#define tol 1.0e-12
 #define iters 10000
-#define initilizedAlpha 3.0
+#define initilizedAlpha 4.0
 #define MAX_DOUBLE 100000000
 #define small_number 1.0e-16	// detect possible numerical errors caused by small divisions
 #define sigma 1.0e-4			// backtracking parameter
 #define rho	0.7			        // backtracking parameter
-#define lev_mar_parameter 2				// Levenberg-Marquardt ni parameter
+#define lev_mar_parameter 2		// Levenberg-Marquardt ni parameter
 
 double * gradientF(double x1, double x2) {
 
@@ -175,7 +175,7 @@ int main(int args, char *argv[]) {
         iter++;
 
     }
-    printf("STEEPEST: Amount of iters: %d, f: %.16f, x1: %.12f, x2: %.12f\n", iter, fCalculation(x_k[0], x_k[1]), x_k[0], x_k[1]);
+    printf("STEEPEST: Amount of iters: %d, f: %.16f, x1: %.16f, x2: %.16f\n", iter, fCalculation(x_k[0], x_k[1]), x_k[0], x_k[1]);
 
     // Original Newton
 	iter = 0;       				
@@ -194,7 +194,7 @@ int main(int args, char *argv[]) {
 		iter++;
 
 	}
-	printf("NEWTON: Amount of iters: %d, f: %.16f, x1: %.12f, x2: %.12f\n", iter, fCalculation(x_k[0], x_k[1]), x_k[0], x_k[1]);
+	printf("NEWTON: Amount of iters: %d, f: %.16f, x1: %.16f, x2: %.16f\n", iter, fCalculation(x_k[0], x_k[1]), x_k[0], x_k[1]);
 
     // Modified Newton
     iter = 0;
@@ -213,7 +213,7 @@ int main(int args, char *argv[]) {
 		iter++;
 
 	}
-	printf("MODIFIED NEWTON: Amount of iters: %d, f: %.16f, x1: %.12f, x2: %.12f\n", iter, fCalculation(x_k[0], x_k[1]), x_k[0], x_k[1]);
+	printf("MODIFIED NEWTON: Amount of iters: %d, f: %.16f, x1: %.16f, x2: %.16f\n", iter, fCalculation(x_k[0], x_k[1]), x_k[0], x_k[1]);
 
     //LEVENBERG-MARQUARDT
 	iter = 0;
@@ -246,7 +246,7 @@ int main(int args, char *argv[]) {
 		iter++;	
 		
 	}
-    printf("LEVENBERG-MARQUARDT: Amount of iters: %d, f: %.16f, x1: %.12f, x2: %.12f\n", iter, fCalculation(x_k[0], x_k[1]), x_k[0], x_k[1]);
+    printf("LEVENBERG-MARQUARDT: Amount of iters: %d, f: %.16f, x1: %.16f, x2: %.16f\n", iter, fCalculation(x_k[0], x_k[1]), x_k[0], x_k[1]);
 
     return 0;
 
